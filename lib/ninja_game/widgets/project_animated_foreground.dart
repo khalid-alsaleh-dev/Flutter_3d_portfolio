@@ -11,7 +11,8 @@ class ProjectAnimatedForeground extends StatelessWidget {
       required this.githubOnPressed,
       required this.image,
       required this.removeForeground,
-      required this.enableToRemoveForeground, required this.delay});
+      required this.enableToRemoveForeground,
+      required this.delay});
   final String title;
   final String description;
   final VoidCallback openOnPressed;
@@ -63,7 +64,9 @@ class ProjectAnimatedForeground extends StatelessWidget {
                         }),
                       ],
                     )
-                        .animate(onPlay: (controller) => controller.repeat(),delay: delay)
+                        .animate(
+                            onPlay: (controller) => controller.repeat(),
+                            delay: delay)
                         .rotate(
                           alignment: Alignment.topCenter,
                           begin: 0,
@@ -122,70 +125,77 @@ class ProjectAnimatedForeground extends StatelessWidget {
                               const SizedBox(
                                 height: 30,
                               ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(title,
-                                        style: const TextStyle(
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(title,
+                                      
+                                          style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 25,
+                                              fontWeight: FontWeight.bold)),
+                                      const SizedBox(
+                                        height: 15,
+                                      ),
+                                      Text(description,
+                                          style: const TextStyle(
                                             color: Colors.white,
-                                            fontSize: 25,
-                                            fontWeight: FontWeight.bold)),
-                                    const SizedBox(
-                                      height: 15,
-                                    ),
-                                    Text(description,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                        )),
-                                    const SizedBox(
-                                      height: 20,
-                                    ),
-                                    Row(
-                                      children: [
-                                        ElevatedButton(
-                                            onPressed: openOnPressed,
-                                            style: const ButtonStyle(
-                                                backgroundColor:
-                                                    MaterialStatePropertyAll(
-                                                        Color(0xff424346)),
-                                                side: MaterialStatePropertyAll(
-                                                    BorderSide(
-                                                        color: Color(
-                                                            0xff65F8AE)))),
-                                            child: const Padding(
-                                              padding: EdgeInsets.all(5.0),
-                                              child: Text('Open',
-                                                  style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 15)),
-                                            )),
-                                        const SizedBox(
-                                          width: 15,
-                                        ),
-                                        ElevatedButton(
-                                            onPressed: githubOnPressed,
-                                            style: const ButtonStyle(
-                                                backgroundColor:
-                                                    MaterialStatePropertyAll(
-                                                        Color(0xff424346)),
-                                                side: MaterialStatePropertyAll(
-                                                    BorderSide(
-                                                        color: Color(
-                                                            0xff65F8AE)))),
-                                            child: const Padding(
-                                              padding: EdgeInsets.all(5.0),
-                                              child: Text('Github',
-                                                  style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 15)),
-                                            ))
-                                      ],
-                                    )
-                                  ],
+                                            fontSize: 15,
+                                          )),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20.0),
+                                  child: Row(
+                                    children: [
+                                      ElevatedButton(
+                                          onPressed: openOnPressed,
+                                          style: const ButtonStyle(
+                                              backgroundColor:
+                                                  MaterialStatePropertyAll(
+                                                      Color(0xff424346)),
+                                              side: MaterialStatePropertyAll(
+                                                  BorderSide(
+                                                      color:
+                                                          Color(0xff65F8AE)))),
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(5.0),
+                                            child: Text('Open',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 15)),
+                                          )),
+                                      const SizedBox(
+                                        width: 15,
+                                      ),
+                                      ElevatedButton(
+                                          onPressed: githubOnPressed,
+                                          style: const ButtonStyle(
+                                              backgroundColor:
+                                                  MaterialStatePropertyAll(
+                                                      Color(0xff424346)),
+                                              side: MaterialStatePropertyAll(
+                                                  BorderSide(
+                                                      color:
+                                                          Color(0xff65F8AE)))),
+                                          child: const Padding(
+                                            padding: EdgeInsets.all(5.0),
+                                            child: Text('Github',
+                                                style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 15)),
+                                          ))
+                                    ],
+                                  ),
                                 ),
                               )
                             ],
@@ -260,7 +270,8 @@ class ProjectAnimatedForeground extends StatelessWidget {
                 ),
               ],
             )
-                .animate(onPlay: (controller) => controller.repeat(),delay: delay)
+                .animate(
+                    onPlay: (controller) => controller.repeat(), delay: delay)
                 .rotate(
                   alignment: Alignment.topCenter,
                   begin: 0,
