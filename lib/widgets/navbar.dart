@@ -1,433 +1,334 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_3d_portfolio/utils/breakpoints.dart';
-import 'package:flutter_3d_portfolio/utils/custom_colors.dart';
-import 'package:flutter_3d_portfolio/utils/image_assets.dart';
-import 'package:flutter_3d_portfolio/widgets/link_button.dart';
-import 'package:flutter_3d_portfolio/widgets/logo.dart';
-import 'package:flutter_3d_portfolio/widgets/section_button.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:reactable/reactable.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../data/portfolio_data.dart';
+import '../utils/custom_colors.dart';
+import '../utils/image_assets.dart';
+import '../audio/sound_toggle.dart';
+import '../utils/launch.dart';
 
+class NavItem {
+  const NavItem(this.label, this.key);
+  final String label;
+  final GlobalKey key;
+}
 
+/// Top bar: transparent over the hero, frosted glass once you scroll. The
+/// bottom edge doubles as a katana-shaped reading progress bar.
 class Navbar extends StatefulWidget {
-  const Navbar({super.key, required this.showNavbarLineAndShowFloatingButton, required this.homeKey, required this.overviewKey, required this.experienceKey, required this.projectsKey, required this.contactKey});
+  const Navbar({
+    super.key,
+    required this.items,
+    required this.active,
+    required this.progress,
+    required this.onSelect,
+  });
 
-  final Reactable<bool> showNavbarLineAndShowFloatingButton;
-  final GlobalKey homeKey;
-  final GlobalKey overviewKey;
-  final GlobalKey experienceKey;
-  final GlobalKey projectsKey;
-  final GlobalKey contactKey;
+  final List<NavItem> items;
+  final ValueListenable<int> active;
+  final ValueListenable<double> progress;
+  final ValueChanged<int> onSelect;
 
   @override
   State<Navbar> createState() => _NavbarState();
 }
 
 class _NavbarState extends State<Navbar> {
-  final Reactable<bool> homeIsHover = false.asReactable;
-  final Reactable<bool> overviewIsHover = false.asReactable;
-  final Reactable<bool> experienceIsHover = false.asReactable;
-  final Reactable<bool> projectsIsHover = false.asReactable;
-  final Reactable<bool> contactIsHover = false.asReactable;
-  final Reactable<bool> showDropdownNavbar = false.asReactable;
+  bool _menuOpen = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      double maxWidth = constraints.maxWidth;
-      if (maxWidth >= Breakpoints.xxlg) {
-        return NavbarOnXLGOrLarger(maxWidth: maxWidth, homeIsHover: homeIsHover, overviewIsHover: overviewIsHover, experienceIsHover: experienceIsHover, projectsIsHover: projectsIsHover, contactIsHover: contactIsHover, showNavbarLineAndShowFloatingButton: widget.showNavbarLineAndShowFloatingButton, homeKey: widget.homeKey, overviewKey: widget.overviewKey, experienceKey: widget.experienceKey, projectsKey: widget.projectsKey, contactKey: widget.contactKey);
-      } else {
-        return NavbarOnLessThanXLG(maxWidth: maxWidth, showDropdownNavbar: showDropdownNavbar, homeKey: widget.homeKey, overviewKey: widget.overviewKey, experienceKey: widget.experienceKey, projectsKey: widget.projectsKey, contactKey: widget.contactKey);
-      }
-    });
+  void _select(int i) {
+    setState(() => _menuOpen = false);
+    widget.onSelect(i);
   }
-}
-
-class NavbarOnXLGOrLarger extends StatelessWidget {
-  const NavbarOnXLGOrLarger({
-    super.key,
-    required this.maxWidth,
-    required this.homeIsHover,
-    required this.overviewIsHover,
-    required this.experienceIsHover,
-    required this.projectsIsHover,
-    required this.contactIsHover, required this.showNavbarLineAndShowFloatingButton, required this.homeKey, required this.overviewKey, required this.experienceKey, required this.projectsKey, required this.contactKey,
-  });
-
-  final double maxWidth;
-  final Reactable<bool> homeIsHover;
-  final Reactable<bool> overviewIsHover;
-  final Reactable<bool> experienceIsHover;
-  final Reactable<bool> projectsIsHover;
-  final Reactable<bool> contactIsHover;
-  final Reactable<bool> showNavbarLineAndShowFloatingButton;
-  final GlobalKey homeKey;
-  final GlobalKey overviewKey;
-  final GlobalKey experienceKey;
-  final GlobalKey projectsKey;
-  final GlobalKey contactKey;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 132,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: maxWidth,
-            height: 130,
-            color: CustomColors.darkBackground,
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 100.0, vertical: 50),
-              child: Stack(
-                alignment: Alignment.topCenter,
+    final width = MediaQuery.sizeOf(context).width;
+    final compact = width < 980;
+    return ValueListenableBuilder<double>(
+      valueListenable: widget.progress,
+      builder: (context, progress, _) {
+        final solid = progress > 0.004 || _menuOpen;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // No BackdropFilter: the scene behind animates every frame, so a
+            // backdrop blur would be recomputed constantly. A dense tint reads
+            // the same over this dark background at a fraction of the cost.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              height: 76,
+              padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 48),
+              color: solid
+                  ? CustomColors.darkBackground.withValues(alpha: 0.88)
+                  : Colors.transparent,
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                       Logo(homeKey: homeKey,),
-                      Row(
+                  _Logo(onTap: () => _select(0)),
+                  const Spacer(),
+                  if (!compact) ...[
+                    ValueListenableBuilder<int>(
+                      valueListenable: widget.active,
+                      builder: (context, active, _) => Row(
                         children: [
-                          LinkButton(
-                            icon: ImageAssets.facebook,
-                            text: 'Facebook',
-                            onPressed: () async{
-                         await launchUrl(Uri.parse('https://www.facebook.com/khalid.alsaleh.52090/'));
-                       },
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                            child: LinkButton(
-                              icon: ImageAssets.github,
-                              text: 'Github',
-                              onPressed: () async{
-                                 await launchUrl(Uri.parse('https://github.com/khalid-alsaleh-dev'));
-                              },
+                          for (var i = 0; i < widget.items.length; i++)
+                            _NavLink(
+                              label: widget.items[i].label,
+                              active: i == active,
+                              onTap: () => _select(i),
                             ),
-                          ),
-                          LinkButton(
-                            icon: ImageAssets.linkedin,
-                            text: 'LinedIn',
-                            onPressed: () async{
-                               await launchUrl(Uri(path:'https://www.linkedin.com/in/khalid-al-saleh-3561881a8/'));
-                            },
-                          )
                         ],
-                      )
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      SectionButton(
-                        text: 'Home',
-                        onPressed: () {
-                          Scrollable.ensureVisible(homeKey.currentContext!,duration: 0.5.seconds,curve: Curves.easeIn);
-                        },
-                        isHover: homeIsHover,
-                        lineWidth: 35,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                        child: SectionButton(
-                          text: 'Overview',
-                          onPressed: () {
-                            Scrollable.ensureVisible(overviewKey.currentContext!,duration: 1.seconds,curve: Curves.easeIn);
-                          },
-                          isHover: overviewIsHover,
-                          lineWidth: 55,
-                        ),
+                    ),
+                    const SizedBox(width: 24),
+                    const _Socials(),
+                    const SizedBox(width: 8),
+                    const SoundToggle(),
+                  ] else ...[
+                    const SoundToggle(),
+                    IconButton(
+                      onPressed: () => setState(() => _menuOpen = !_menuOpen),
+                      icon: Icon(
+                        _menuOpen ? Icons.close_rounded : Icons.menu_rounded,
+                        color: Colors.white,
+                        size: 28,
                       ),
-                      SectionButton(
-                        text: 'Experience',
-                        onPressed: () {
-                          Scrollable.ensureVisible(experienceKey.currentContext!,duration: 1.5.seconds,curve: Curves.easeIn);
-                        },
-                        isHover: experienceIsHover,
-                        lineWidth: 70,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 40.0),
-                        child: SectionButton(
-                          text: 'Projects',
-                          onPressed: () {
-                            Scrollable.ensureVisible(projectsKey.currentContext!,duration: 2.seconds,curve: Curves.easeIn);
-                          },
-                          isHover: projectsIsHover,
-                          lineWidth: 50,
-                        ),
-                      ),
-                      SectionButton(
-                        text: 'Contact',
-                        onPressed: () {
-                          Scrollable.ensureVisible(contactKey.currentContext!,duration: 2.5.seconds,curve: Curves.easeIn);
-                        },
-                        isHover: contactIsHover,
-                        lineWidth: 50,
-                      ),
-                    ],
-                  )
+                    ),
+                  ],
                 ],
               ),
             ),
-          ),
-               Scope(builder: (context) {
-                    return showNavbarLineAndShowFloatingButton.value
-                        ? Container(
-                            width: maxWidth,
-                            height: 2,
-                            decoration: const BoxDecoration(
-                                color: CustomColors.primary,
-                                boxShadow: [
-                                  BoxShadow(
-                                      spreadRadius: 0,
-                                      blurRadius: 8,
-                                      color: CustomColors.primary)
-                                ]),
-                          ).animate().scaleX()
-                        : const SizedBox.shrink();
-                  })
-        
+            _ProgressBlade(progress: progress),
+            if (compact && _menuOpen) _mobileMenu(context),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _mobileMenu(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: CustomColors.darkBackground.withValues(alpha: 0.96),
+      padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < widget.items.length; i++)
+            TextButton(
+                  onPressed: () => _select(i),
+                  child: Text(
+                    widget.items[i].label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+                .animate()
+                .fadeIn(delay: (i * 60).ms)
+                .slideX(begin: -0.2, delay: (i * 60).ms),
+          const SizedBox(height: 16),
+          const _Socials(),
         ],
       ),
     );
   }
 }
 
-class NavbarOnLessThanXLG extends StatelessWidget {
-  const NavbarOnLessThanXLG({
-    super.key,
-    required this.maxWidth,
-    required this.showDropdownNavbar, required this.homeKey, required this.overviewKey, required this.experienceKey, required this.projectsKey, required this.contactKey,
-  });
-
-  final double maxWidth;
-  final Reactable<bool> showDropdownNavbar;
-   final GlobalKey homeKey;
-  final GlobalKey overviewKey;
-  final GlobalKey experienceKey;
-  final GlobalKey projectsKey;
-  final GlobalKey contactKey;
+class _Logo extends StatelessWidget {
+  const _Logo({required this.onTap});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Align(
-          alignment: Alignment.topCenter,
-          child: Padding(
-            padding: const EdgeInsets.only(top: 120.0),
-            child: Scope(builder: (context) {
-              return SizedBox(
-                width: maxWidth,
-                height: maxWidth / 4,
-                child: ListView(
-                  children: [
-                    InkWell(
-                       onTap: () {
-                        showDropdownNavbar.value=false;
-                        Scrollable.ensureVisible(homeKey.currentContext!,duration: 0.5.seconds,curve: Curves.easeIn);
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child: const Padding(
-                          padding:  EdgeInsets.all(20.0),
-                          child:  Text(
-                            'Home',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                   InkWell(
-                       onTap: () {
-                        showDropdownNavbar.value=false;
-                        Scrollable.ensureVisible(overviewKey.currentContext!,duration: 1.seconds,curve: Curves.easeIn);
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child: const Padding(
-                          padding:  EdgeInsets.all(20.0),
-                          child:  Text(
-                            'Overview',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                   InkWell(
-                       onTap: () {
-                        showDropdownNavbar.value=false;
-                        Scrollable.ensureVisible(experienceKey.currentContext!,duration: 1.5.seconds,curve: Curves.easeIn);
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child: const Padding(
-                          padding:  EdgeInsets.all(20.0),
-                          child:  Text(
-                            'Experience',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                   InkWell(
-                       onTap: () {
-                        showDropdownNavbar.value=false;
-                        Scrollable.ensureVisible(projectsKey.currentContext!,duration: 1.5.seconds,curve: Curves.easeIn);
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child: const Padding(
-                          padding:  EdgeInsets.all(20.0),
-                          child:  Text(
-                            'Projects',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                InkWell(
-                       onTap: () {
-                        showDropdownNavbar.value=false;
-                        Scrollable.ensureVisible(contactKey.currentContext!,duration: 1.5.seconds,curve: Curves.easeIn);
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child: const Padding(
-                          padding:  EdgeInsets.all(20.0),
-                          child:  Text(
-                            'Contact',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ),
-                 InkWell(
-                       onTap: () async{
-                         await launchUrl(Uri.parse('https://github.com/khalid-alsaleh-dev'));
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child:  Padding(
-                          padding:  const EdgeInsets.all(20.0),
-                          child:  Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children:  [
-                             const Text(
-                                'Github',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              Image.asset(ImageAssets.github)
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                        InkWell(
-                       onTap: () async{
-                         await launchUrl(Uri.parse(  'https://www.facebook.com/khalid.alsaleh.52090/'));
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child:  Padding(
-                          padding:  const EdgeInsets.all(20.0),
-                          child:  Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children:  [
-                             const Text(
-                                'Facebook',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              Image.asset(ImageAssets.facebook)
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                      InkWell(
-                       onTap: () async{
-                          await launchUrl(Uri.parse(  'https://www.linkedin.com/in/khalid-al-saleh-3561881a8/'));
-                       },
-                      child: Container(
-                        color: CustomColors.brightBackground,
-                        child:  Padding(
-                          padding:  const EdgeInsets.all(20.0),
-                          child:  Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children:  [
-                             const Text(
-                                'LinkedIn',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                              Image.asset(ImageAssets.linkedin)
-                            ],
-                          ),
-                        ),
-                      ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(ImageAssets.logo, height: 26),
+          const SizedBox(width: 10),
+          const Text(
+            PortfolioData.name,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            PortfolioData.surname,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavLink extends StatefulWidget {
+  const _NavLink({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  State<_NavLink> createState() => _NavLinkState();
+}
+
+class _NavLinkState extends State<_NavLink> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final lit = _hover || widget.active;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.label,
+                style: TextStyle(
+                  color: lit
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.6),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                width: lit ? 26 : 0,
+                height: 2,
+                decoration: BoxDecoration(
+                  color: widget.active
+                      ? CustomColors.primary
+                      : CustomColors.secondary,
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          (widget.active
+                                  ? CustomColors.primary
+                                  : CustomColors.secondary)
+                              .withValues(alpha: 0.8),
+                      blurRadius: 8,
                     ),
                   ],
                 ),
-              )
-                  .animate(target: showDropdownNavbar.value ? 1 : 0)
-                  .scaleY(alignment: Alignment.topCenter);
-            }),
-          ),
-        ),
-        Align(
-          alignment: Alignment.topRight,
-          child: Padding(
-            padding: const EdgeInsets.all(50.0),
-            child: ElevatedButton(
-              onPressed: () {
-                showDropdownNavbar.value = !showDropdownNavbar.value;
-              },
-              style: const ButtonStyle(
-                  shape: MaterialStatePropertyAll(CircleBorder()),
-                  backgroundColor: MaterialStatePropertyAll(
-                      CustomColors.brightBackground),
-                  elevation: MaterialStatePropertyAll(5)),
-              child: const Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Icon(
-                  Icons.list,
-                  size: 25,
-                ),
               ),
-            ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Socials extends StatelessWidget {
+  const _Socials();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget icon(String asset, String tooltip, String url) => Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => openUrl(url),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Image.asset(asset, width: 22, height: 22),
+        ),
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        icon(ImageAssets.github, 'GitHub', Links.github),
+        icon(ImageAssets.linkedin, 'LinkedIn', Links.linkedin),
+        icon(ImageAssets.facebook, 'Facebook', Links.facebook),
       ],
     );
   }
 }
 
+/// Reading progress drawn as a blade with a glowing tip.
+class _ProgressBlade extends StatelessWidget {
+  const _ProgressBlade({required this.progress});
+  final double progress;
 
-  void scrollToWidgetByKey(GlobalKey key,ScrollController scrollController) {
-    RenderBox box = key.currentContext?.findRenderObject() as RenderBox;
-    Offset position = box.localToGlobal(Offset.zero); //this is global position
-    double y = position.dy;
-    scrollController.animateTo(y,
-        duration: const Duration(milliseconds: 700), curve: Curves.easeInOut);
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 3,
+      width: double.infinity,
+      child: CustomPaint(painter: _ProgressPainter(progress)),
+    );
   }
+}
+
+class _ProgressPainter extends CustomPainter {
+  _ProgressPainter(this.progress);
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0) return;
+    final end = size.width * progress.clamp(0.0, 1.0);
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(end - 14, 0)
+      ..lineTo(end, size.height / 2)
+      ..lineTo(end - 14, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          colors: [
+            CustomColors.secondary.withValues(alpha: 0.6),
+            CustomColors.steel,
+            Colors.white,
+          ],
+          stops: const [0, 0.85, 1],
+        ).createShader(Rect.fromLTWH(0, 0, end, size.height)),
+    );
+    final tip = Offset(end, size.height / 2);
+    canvas.drawCircle(
+      tip,
+      9,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            CustomColors.primary.withValues(alpha: 0.85),
+            CustomColors.primary.withValues(alpha: 0),
+          ],
+        ).createShader(Rect.fromCircle(center: tip, radius: 9)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProgressPainter old) =>
+      old.progress != progress;
+}

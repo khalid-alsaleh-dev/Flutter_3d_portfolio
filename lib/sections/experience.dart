@@ -1,230 +1,393 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_3d_portfolio/utils/breakpoints.dart';
-import 'package:flutter_3d_portfolio/utils/constants.dart';
-import 'package:flutter_3d_portfolio/utils/custom_colors.dart';
-import 'package:flutter_3d_portfolio/utils/image_assets.dart';
-import 'package:flutter_3d_portfolio/widgets/experience_block.dart';
-import 'package:reactable/reactable.dart';
-import 'package:visibility_detector/visibility_detector.dart';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
-class Experience extends StatefulWidget {
+import 'package:flutter/material.dart';
+
+import '../data/portfolio_data.dart';
+import '../effects/scroll_progress.dart';
+import '../effects/slash_heading.dart';
+import '../effects/tilt_card.dart';
+import '../three_d/mesh.dart';
+import '../three_d/models.dart';
+import '../utils/custom_colors.dart';
+import '../widgets/emblem_view.dart';
+import '../widgets/section_frame.dart';
+import '../widgets/tech_chip.dart';
+
+/// Work history on a timeline whose spine is a katana blade that draws itself
+/// as you scroll. Each stop is a spinning 3D shuriken.
+class Experience extends StatelessWidget {
   const Experience({super.key});
 
   @override
-  State<Experience> createState() => _ExperienceState();
+  Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 900;
+    return SectionFrame(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 120),
+        child: Column(
+          crossAxisAlignment: wide
+              ? CrossAxisAlignment.center
+              : CrossAxisAlignment.start,
+          children: [
+            SlashHeading(
+              eyebrow: 'What I have done so far',
+              title: 'Work Experience.',
+              alignment: wide
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.start,
+            ),
+            const SizedBox(height: 72),
+            ScrollProgress(
+              builder: (context, p, _) {
+                final drawn = interval(p, 0.12, 0.72);
+                return Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Align(
+                        alignment: wide
+                            ? Alignment.topCenter
+                            : Alignment.topLeft,
+                        child: Padding(
+                          padding: EdgeInsets.only(left: wide ? 0 : 22),
+                          child: SizedBox(
+                            width: 18,
+                            height: double.infinity,
+                            child: CustomPaint(
+                              painter: _BladeSpinePainter(drawn),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Column(
+                      children: [
+                        for (var i = 0; i < PortfolioData.jobs.length; i++)
+                          _JobRow(
+                            job: PortfolioData.jobs[i],
+                            index: i,
+                            wide: wide,
+                            spin: p,
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _ExperienceState extends State<Experience> {
-  final Reactable<bool> showAndroidExperience = false.asReactable;
-  final Reactable<bool> showFlutterExperience = false.asReactable;
-  final Reactable<bool> showNestjsExperience = false.asReactable;
-  final Reactable<double> heightOfAndroid = 10.0.asReactable;
-  final Reactable<double> heightOfFlutter = 10.0.asReactable;
-  final Reactable<double> heightOfNest = 10.0.asReactable;
-  final GlobalKey androidKey = GlobalKey();
-  final GlobalKey flutterKey = GlobalKey();
-  final GlobalKey nestKey = GlobalKey();
+class _JobRow extends StatelessWidget {
+  const _JobRow({
+    required this.job,
+    required this.index,
+    required this.wide,
+    required this.spin,
+  });
+
+  final Job job;
+  final int index;
+  final bool wide;
+  final double spin;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      double maxWidth = constraints.maxWidth;
-      return Stack(
-        children: [
-          Positioned(
-              top: 300,
-              right: 400,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                    color: CustomColors.purple,
-                    borderRadius: BorderRadius.circular(30)),
-              )),
-          Positioned(
-              top: 140,
-              right: 650,
-              child: Container(
-                width: 15,
-                height: 15,
-                decoration: BoxDecoration(
-                    color: CustomColors.primary,
-                    borderRadius: BorderRadius.circular(30)),
-              )),
-          Positioned(
-              top: 140,
-              left: 400,
-              child: Container(
-                width: 15,
-                height: 15,
-                decoration: BoxDecoration(
-                    color: CustomColors.secondary,
-                    borderRadius: BorderRadius.circular(30)),
-              )),
-          Positioned(
-              top: 700,
-              left: 430,
-              child: Container(
-                width: 15,
-                height: 15,
-                decoration: BoxDecoration(
-                    color: CustomColors.primary,
-                    borderRadius: BorderRadius.circular(30)),
-              )),
-          Positioned(
-              top: 1000,
-              right: 430,
-              child: Container(
-                width: 15,
-                height: 15,
-                decoration: BoxDecoration(
-                    color: CustomColors.secondary,
-                    borderRadius: BorderRadius.circular(30)),
-              )),
-          SizedBox(
-            width: maxWidth,
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: maxWidth * 0.04,
-                left: maxWidth >= Breakpoints.xxlg
-                    ? 0
-                    : maxWidth * Constants.smallHorizontalPaddingRatio,
-                right:  maxWidth >= Breakpoints.xxlg
-                    ? 0
-                    : maxWidth * Constants.smallHorizontalPaddingRatio,    
+    final fromLeft = wide && index.isEven;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 56),
+      child: ScrollProgress(
+        builder: (context, p, _) {
+          final t = interval(p, 0.08, 0.34, Curves.easeOutCubic);
+          final card = _swingIn(t, fromLeft, _JobCard(job: job, index: index));
+          final time = Opacity(
+            opacity: t,
+            child: Text(
+              job.time,
+              textAlign: fromLeft ? TextAlign.left : TextAlign.right,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 16,
+                letterSpacing: 2,
+                fontWeight: FontWeight.w600,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-            Align(
-                    alignment:maxWidth>=Breakpoints.lg?Alignment.center:Alignment.centerLeft ,
-                    child: const Text('What i have done so far',
-                        style: TextStyle(color: Colors.white, fontSize: 16)),
-                  ),
-                  const SizedBox(
-                    height: 10,
-                  ),
-                  Align(
-                    alignment:maxWidth>=Breakpoints.lg?Alignment.center:Alignment.centerLeft ,
-                    child: const Text('Work Experience.',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 40,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(
-                    height: 40,
-                  ),
-                  SizedBox(
-                    width: maxWidth,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: maxWidth >= Breakpoints.xxlg
-                    ? (maxWidth * Constants.mediumAndAboveHorizontalPaddingRatio)-0.05*maxWidth
-                    : (maxWidth * Constants.smallHorizontalPaddingRatio)-0.05*maxWidth,
+            ),
+          );
+          final node = SizedBox(
+            width: 62,
+            height: 62,
+            child: CustomPaint(painter: _ShurikenNode(spin * 26 + index, t)),
+          );
+          if (!wide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                node,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 18, bottom: 12),
+                        child: time,
                       ),
-                      child: Stack(
-                        alignment:maxWidth>=Breakpoints.lg? Alignment.topCenter:Alignment.topLeft,
-                        children: [
-                          Scope(builder: (context) {
-                            return Padding(
-                              padding:  EdgeInsets.only(left:maxWidth<Breakpoints.lg?20:0 ),
-                              child: Container(
-                                width: 3,
-                                height: heightOfAndroid.value +
-                                    heightOfFlutter.value +
-                                    heightOfNest.value+200,
-                                color: Colors.white,
-                              ),
-                            );
-                          }),
-                          VisibilityDetector(
-                            key: const Key('android'),
-                            onVisibilityChanged: (_) {
-                              heightOfAndroid.value =
-                                  androidKey.currentContext?.size?.height ??
-                                      0.0;
-                            },
-                            child: Padding(
-                       padding: const EdgeInsets.only(top: 50),
-                              child: ExperienceBlock(
-                                key: androidKey,
-                                image: ImageAssets.android,
-                                title: 'Android Developer',
-                                description: 'I started my programming journey in android native development. I have had a very good experience in building native android applications. I used in my journey many amazing libraires like retrofit, firebase, SQLite and so many of them.',
-                                time: 'Jan 2019 - Feb 2020',
-                                multidirection: maxWidth>=Breakpoints.lg,
-                                topPadding: 50,
-                                playAnimation: showAndroidExperience,
-                                cardAlignment:maxWidth>=Breakpoints.lg? Alignment.topLeft:Alignment.topLeft,
-                                timeTextPadding: const EdgeInsets.only(left: 250),
-                              ),
-                            ),
-                          ),
-                          VisibilityDetector(
-                            key: const Key('flutter'),
-                            onVisibilityChanged: (_) {
-                              heightOfFlutter.value =
-                                  flutterKey.currentContext?.size?.height ??
-                                      0.0;
-                            },
-                            child: Scope(builder: (context) {
-                              return Padding(
-                                padding: 
-                                 EdgeInsets.only(top:heightOfAndroid.value + 110,),
-                                child: ExperienceBlock(
-                                  key: flutterKey,
-                                  image: ImageAssets.flutter,
-                                  title: 'Flutter Developer',
-                                  description:
-                                      '''Experience in development of Android/iOS applications and have deployed them on Google Play/App Store. 4+ years knowledge in mobile app development. In depth understanding of front end languages like HTML, CSS3 and JavaScript. Knowledge of Dart programming language, Rest APIs and integration of various APIs from third parties. Comfortable using test cases for debugging code, enhancing performance and reliability. Great experience in state management solutions like bloc library and getx light fremework.
-                                              ''',
-                                  time: 'May 2019 - Present',
-                                  multidirection: maxWidth>=Breakpoints.lg,
-                                  topPadding: heightOfAndroid.value + 110,
-                                  playAnimation: showFlutterExperience,
-                                  cardAlignment:maxWidth>=Breakpoints.lg? Alignment.topRight:Alignment.topLeft,
-                                  timeTextPadding:
-                                      const EdgeInsets.only(right: 250),
-                                ),
-                              );
-                            }),
-                          ),
-                          VisibilityDetector(
-                            key: const Key('nest'),
-                            onVisibilityChanged: (_) {
-                              heightOfNest.value =
-                                  nestKey.currentContext?.size?.height ?? 0.0;
-                            },
-                            child: Scope(builder: (context) {
-                              return Padding(
-                                padding:  EdgeInsets.only(top:heightOfAndroid.value+ heightOfFlutter.value + 150),
-                                child: ExperienceBlock(
-                                  key: nestKey,
-                                  image: ImageAssets.nestjs,
-                                  title: 'Nestjs Developer',
-                                  description: 'I have a very good experience in nestjs basics and techniques like typeorm, redis, queue, middlewares, interceptors, graphql and so many of them.',
-                                  time: 'Jan 2022 - Present',
-                                  multidirection: maxWidth>=Breakpoints.lg,
-                                  topPadding: heightOfFlutter.value + 150,
-                                  playAnimation: showNestjsExperience,
-                                  cardAlignment:maxWidth>=Breakpoints.lg? Alignment.topLeft:Alignment.topLeft,
-                                  timeTextPadding:
-                                      const EdgeInsets.only(left: 250),
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
+                      card,
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: fromLeft
+                    ? card
+                    : Padding(
+                        padding: const EdgeInsets.only(top: 20, right: 32),
+                        child: time,
                       ),
-                    ),
-                  )
-                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: node,
+              ),
+              Expanded(
+                child: fromLeft
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 20, left: 32),
+                        child: time,
+                      )
+                    : card,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _swingIn(double t, bool fromLeft, Widget child) {
+    final dir = fromLeft ? -1.0 : 1.0;
+    return Opacity(
+      opacity: t.clamp(0.0, 1.0),
+      child: Transform(
+        alignment: fromLeft ? Alignment.centerRight : Alignment.centerLeft,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.0012)
+          ..translateByDouble(dir * 140 * (1 - t), 0, 0, 1)
+          ..rotateY(-dir * (1 - t) * 1.1),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _JobCard extends StatelessWidget {
+  const _JobCard({required this.job, required this.index});
+  final Job job;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    return TiltCard(
+      maxTilt: 0.1,
+      glowColor: index.isOdd ? CustomColors.secondary : CustomColors.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: EmblemView(job.emblem),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  job.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            job.summary,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 16,
+              height: 1.55,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          for (final point in job.highlights) _Highlight(text: point),
+          if (job.stack.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [for (final tech in job.stack) TechChip(label: tech)],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Highlight extends StatelessWidget {
+  const _Highlight({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 9, right: 12),
+            child: Container(
+              width: 12,
+              height: 2,
+              color: CustomColors.secondary,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.72),
+                fontSize: 14.5,
+                height: 1.55,
               ),
             ),
           ),
         ],
-      );
-    });
+      ),
+    );
   }
+}
+
+/// A vertical katana: steel blade with a glowing edge, drawn down to
+/// [progress] of the available height, ending in a sharp tip.
+class _BladeSpinePainter extends CustomPainter {
+  _BladeSpinePainter(this.progress);
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0) return;
+    final cx = size.width / 2;
+    final length = size.height * progress;
+    final half = 3.5;
+    final tip = 22.0;
+    final path = Path()
+      ..moveTo(cx - half, 0)
+      ..lineTo(cx + half, 0)
+      ..lineTo(cx + half, math.max(0, length - tip))
+      ..lineTo(cx, length)
+      ..lineTo(cx - half, math.max(0, length - tip))
+      ..close();
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, length),
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset.zero,
+          Offset(size.width, 0),
+          [
+            Colors.transparent,
+            CustomColors.primary.withValues(alpha: 0.35),
+            Colors.transparent,
+          ],
+          const [0, 0.5, 1],
+        ),
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(cx - half, 0),
+          Offset(cx + half, 0),
+          const [Color(0xff6f7a84), Color(0xfff4f8fb), Color(0xff9aa5af)],
+          const [0, 0.45, 1],
+        ),
+    );
+    // The glint that rides down the blade with the scroll.
+    final glintY = length - tip - 40;
+    if (glintY > 0) {
+      canvas.drawCircle(
+        Offset(cx, glintY),
+        14,
+        Paint()
+          ..shader = ui.Gradient.radial(Offset(cx, glintY), 14, [
+            Colors.white,
+            Colors.white.withValues(alpha: 0),
+          ]),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BladeSpinePainter old) =>
+      old.progress != progress;
+}
+
+class _ShurikenNode extends CustomPainter {
+  _ShurikenNode(this.angle, this.reveal);
+  final double angle;
+  final double reveal;
+
+  static final _painter = MeshPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    canvas.drawCircle(
+      c,
+      size.width / 2,
+      Paint()..color = CustomColors.darkBackground,
+    );
+    canvas.drawCircle(
+      c,
+      size.width / 2,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = CustomColors.primary.withValues(alpha: 0.3 + 0.5 * reveal),
+    );
+    final model = Matrix4.identity()
+      ..rotateX(0.5)
+      ..rotateZ(angle);
+    _painter.paint(
+      canvas,
+      Models.shuriken,
+      model,
+      center: c,
+      scale: size.width * 0.36 * (0.4 + 0.6 * reveal),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShurikenNode old) =>
+      old.angle != angle || old.reveal != reveal;
 }
