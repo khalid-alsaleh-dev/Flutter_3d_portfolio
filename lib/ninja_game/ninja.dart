@@ -76,7 +76,7 @@ class Ninja extends SpriteAnimationComponent
   }
 
   void _resize(_Strip s) {
-    final scale = game.size.y * 0.3 / 439;
+    final scale = game.size.y * 0.26 / 439;
     size = s.sourceSize * scale;
     anchor = Anchor(s.bodyX, 1);
   }

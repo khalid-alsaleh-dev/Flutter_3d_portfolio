@@ -45,7 +45,7 @@ class _NavbarState extends State<Navbar> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final compact = width < 980;
+    final compact = width < 1100;
     return ValueListenableBuilder<double>(
       valueListenable: widget.progress,
       builder: (context, progress, _) {
