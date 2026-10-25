@@ -157,6 +157,95 @@ class _PhonePainter extends CustomPainter {
         _deals(canvas, s, top, pad);
       case MockLayout.shop:
         _shop(canvas, s, top, pad);
+      case MockLayout.course:
+        _course(canvas, s, top, pad);
+    }
+  }
+
+  void _course(Canvas canvas, Size s, double top, double pad) {
+    final w = s.width;
+    // Video player with a play button and a watched-progress bar.
+    final player = Rect.fromLTWH(pad, top, w - pad * 2, (w - pad * 2) * 0.58);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(player, Radius.circular(w * 0.05)),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.55), _ink],
+        ).createShader(player),
+    );
+    final c = player.center;
+    final r = player.height * 0.17;
+    canvas.drawCircle(
+      c,
+      r,
+      Paint()..color = Colors.white.withValues(alpha: 0.9),
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(c.dx - r * 0.3, c.dy - r * 0.45)
+        ..lineTo(c.dx + r * 0.5, c.dy)
+        ..lineTo(c.dx - r * 0.3, c.dy + r * 0.45)
+        ..close(),
+      Paint()..color = accent,
+    );
+    final track = Rect.fromLTWH(
+      player.left + pad * 0.6,
+      player.bottom - pad * 0.9,
+      player.width - pad * 1.2,
+      w * 0.018,
+    );
+    _bar(canvas, track, Colors.white.withValues(alpha: 0.25));
+    _bar(
+      canvas,
+      Rect.fromLTWH(track.left, track.top, track.width * 0.62, track.height),
+      accent,
+    );
+
+    // Lessons, each with its own progress.
+    final rowH = w * 0.2;
+    var y = player.bottom + pad;
+    for (var i = 0; i < 5 && y + rowH <= s.height; i++, y += rowH + pad * 0.5) {
+      final row = Rect.fromLTWH(pad, y, w - pad * 2, rowH);
+      _card(canvas, row);
+      final thumb = Rect.fromLTWH(
+        row.left + rowH * 0.15,
+        row.top + rowH * 0.15,
+        rowH * 0.9,
+        rowH * 0.7,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(thumb, Radius.circular(w * 0.02)),
+        Paint()..color = accent.withValues(alpha: 0.2 + 0.1 * (i % 3)),
+      );
+      _bar(
+        canvas,
+        Rect.fromLTWH(
+          thumb.right + pad * 0.5,
+          row.top + rowH * 0.25,
+          row.width * 0.45,
+          rowH * 0.13,
+        ),
+        Colors.white.withValues(alpha: 0.75),
+      );
+      final prog = Rect.fromLTWH(
+        thumb.right + pad * 0.5,
+        row.top + rowH * 0.6,
+        row.width * 0.5,
+        rowH * 0.09,
+      );
+      _bar(canvas, prog, Colors.white.withValues(alpha: 0.15));
+      _bar(
+        canvas,
+        Rect.fromLTWH(
+          prog.left,
+          prog.top,
+          prog.width * [1.0, 0.8, 0.45, 0.2, 0.05][i],
+          prog.height,
+        ),
+        accent,
+      );
     }
   }
 

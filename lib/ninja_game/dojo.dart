@@ -69,7 +69,7 @@ class _DojoState extends State<Dojo> {
       key: const Key('dojo'),
       onVisibilityChanged: _visibility,
       child: Container(
-        height: 860,
+        height: 940,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: CustomColors.glassBorder),
@@ -162,7 +162,7 @@ class _HangingProject extends StatelessWidget {
             // The project itself, waiting behind the plate.
             Padding(
               padding: const EdgeInsets.only(top: 110),
-              child: ProjectCard(project: project)
+              child: ProjectCard(project: project, compact: true)
                   .animate(target: isCut ? 1 : 0)
                   .fadeIn(duration: 500.ms)
                   .scaleXY(begin: 0.92, end: 1, curve: Curves.easeOutBack),

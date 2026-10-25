@@ -48,7 +48,7 @@ class SkillGroup {
 }
 
 /// Which kind of screen the project's phone mockup shows.
-enum MockLayout { dashboard, live, deals, shop }
+enum MockLayout { dashboard, live, deals, shop, course }
 
 class Project {
   const Project(
@@ -60,6 +60,12 @@ class Project {
     this.tags = const [],
     this.url,
     this.github,
+    this.appStore,
+    this.playStore,
+    this.note = 'Private client project',
+    this.preview,
+    this.previewAspect = 1,
+    this.previewHost,
   });
   final String title;
   final String description;
@@ -67,10 +73,29 @@ class Project {
   final IconData icon;
   final MockLayout layout;
   final List<String> tags;
+
+  /// Public website.
   final String? url;
 
   /// Client work is usually private, so a repository link is optional.
   final String? github;
+  final String? appStore;
+  final String? playStore;
+
+  /// Shown instead of links when a project has none.
+  final String note;
+
+  /// Full-page website screenshot played as a scrolling preview, and its
+  /// height-to-width ratio. Without one, the card shows a phone mockup.
+  final String? preview;
+  final double previewAspect;
+
+  /// Address shown in the preview's browser bar when there is no [url] to
+  /// link to (for example, a platform that is no longer online).
+  final String? previewHost;
+
+  bool get hasLinks =>
+      url != null || github != null || appStore != null || playStore != null;
 }
 
 class PortfolioData {
@@ -85,7 +110,7 @@ class PortfolioData {
   static const typedRoles = [
     'Senior Flutter Engineer',
     'Mobile Architect',
-    'NestJS Backend Engineer',
+    'Backend Lead (NestJS)',
     'Engineering Team Lead',
   ];
 
@@ -106,11 +131,13 @@ class PortfolioData {
 
   static const jobs = [
     Job(
-      'Backend & Flutter Engineer',
-      Emblem.image(ImageAssets.flutter),
+      'Backend Lead & Flutter Engineer',
+      Emblem.image(ImageAssets.nestjs),
       'Mar 2024 - Present · Dubai',
-      'Production Flutter features for a multi-tenant HR SaaS platform used by multiple organizations, and the backend services behind them.',
+      'Led the backend for two production platforms, an AI-powered multi-tenant HR SaaS and a video-learning platform, while building Flutter features on the mobile side.',
       highlights: [
+        'Led backend architecture and delivery for the HR platform and the video-learning platform.',
+        'Built secure, banking-integrated APIs for course payments and commission withdrawals.',
         'Build and maintain production Flutter features backed by scalable backend services and REST APIs.',
         'Implement real-time communication between the Flutter apps and backend services.',
         'Improved API response times by ~35% through Redis caching and database query optimization.',
@@ -165,7 +192,7 @@ class PortfolioData {
     ),
     Job(
       'Flutter & Backend Developer',
-      Emblem.image(ImageAssets.nestjs),
+      Emblem.image(ImageAssets.flutter),
       '2019 - 2021',
       'Enterprise mobile applications and the backend modules behind them.',
       highlights: [
@@ -180,20 +207,30 @@ class PortfolioData {
 
   static const projects = [
     Project(
-      'Multi-Tenant HR Platform',
-      'Production Flutter app for an HR SaaS used by multiple organizations: tenant-aware sessions, real-time updates from the backend and REST integration with scalable services.',
-      accent: Color(0xff6AE99F),
+      'MAI HRMS',
+      'Backend lead for an AI-powered, multi-tenant HR platform for UAE businesses. I led the NestJS backend: strict tenant data isolation, payroll, attendance and leave services, real-time communication with the apps, and Redis caching that cut API response times by ~35%. I also build its Flutter mobile app.',
+      accent: Color(0xff8B7CFF),
       icon: Icons.badge_rounded,
       layout: MockLayout.dashboard,
-      tags: ['Flutter', 'Multi-tenant', 'Real-time', 'Redis'],
+      tags: ['Backend lead', 'NestJS', 'Multi-tenant', 'Redis', 'Flutter'],
+      url: 'https://maihrms.com',
+      preview: 'assets/images/previews/maihrms.webp',
+      previewAspect: 7000 / 720,
+      appStore: 'https://apps.apple.com/ae/app/mai-hrms/id6760653604',
+      playStore:
+          'https://play.google.com/store/apps/details?id=com.softbuilders.maihrms',
     ),
     Project(
-      'Real-Time Ops Manager',
-      'Enterprise operations management platform with live data, built in Flutter on top of reusable backend modules.',
-      accent: Color(0xff5F70F9),
-      icon: Icons.monitor_heart_rounded,
-      layout: MockLayout.live,
-      tags: ['Flutter', 'Real-time', 'Node.js', 'Enterprise'],
+      'Skillami',
+      'Backend lead for an online video-learning platform. I led the backend behind video streaming, authentication, course management and real-time progress tracking, plus secure banking-integrated APIs for course payments and commission withdrawals, shipped through CI/CD pipelines.',
+      accent: Color(0xffE5383B),
+      icon: Icons.play_lesson_rounded,
+      layout: MockLayout.course,
+      tags: ['Backend lead', 'Video streaming', 'Payments', 'CI/CD'],
+      note: 'Web platform · no longer online',
+      preview: 'assets/images/previews/skillami.webp',
+      previewAspect: 1837 / 720,
+      previewHost: 'skillami.com',
     ),
     Project(
       'Deals Marketplace',

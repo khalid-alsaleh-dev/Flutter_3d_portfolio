@@ -21,7 +21,10 @@ soon will be hosted
   1. `cd <../path/to/Flutter_3d_portfolio>`
   2. `flutter pub get`
 - Run the next command to run the project on the web `flutter run -d chrome`
-- Build for hosting: `flutter build web --release --wasm` (output in `build/web`)
+- Build for hosting: `flutter build web --release --wasm` (output in `build/web`).
+  Deploy the entire `build/web` directory, including its `assets` directory;
+  deploying only `web/index.html` causes the `model_viewer_plus` JavaScript
+  file to return 404 on GitHub Pages.
   - `--wasm` roughly doubles frame rate and halves memory in browsers with WasmGC (Chrome, Edge, Firefox, Safari 18.2+); other browsers automatically get the JavaScript build from the same output.
   - Serve with `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` so rendering runs on its own thread. `web/_headers` sets them on Netlify and Cloudflare Pages; on Firebase Hosting add them under `hosting.headers` in `firebase.json`.
 

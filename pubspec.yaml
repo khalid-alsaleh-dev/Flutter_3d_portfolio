@@ -33,6 +33,7 @@ flutter:
     - assets/three_d_models/planet/textures/
     - assets/images/
     - assets/images/sprites/
+    - assets/images/previews/
     - assets/audio/
 
   fonts:
