@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Portfolio (Chrome)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      // Chrome relaunches itself without admin rights when started from an
+      // elevated session, which detaches it from Flutter's debugger.
+      "args": ["--web-browser-flag=--do-not-de-elevate"]
+    }
+  ]
+}

@@ -1,11 +1,11 @@
 {
-    "name": "flutter_3d_portfolio",
-    "short_name": "flutter_3d_portfolio",
+    "name": "Khalid Al-Saleh · Shinobi of Code",
+    "short_name": "Khalid",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0b0d13",
+    "theme_color": "#0b0d13",
+    "description": "Ninja-themed 3D portfolio of Khalid Al-Saleh.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

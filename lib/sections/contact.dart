@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_3d_portfolio/utils/breakpoints.dart';
-import 'package:flutter_3d_portfolio/utils/constants.dart';
-import 'package:flutter_3d_portfolio/utils/custom_colors.dart';
-import 'package:flutter_3d_portfolio/widgets/planet.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:reactable/reactable.dart';
-import 'package:visibility_detector/visibility_detector.dart';
+
+import '../effects/scroll_progress.dart';
+import '../effects/slash_heading.dart';
+import '../utils/custom_colors.dart';
+import '../utils/launch.dart';
+import '../widgets/blade_button.dart';
+import '../widgets/planet.dart';
+import '../widgets/section_frame.dart';
 
 class Contact extends StatefulWidget {
   const Contact({super.key});
@@ -15,319 +16,132 @@ class Contact extends StatefulWidget {
 }
 
 class _ContactState extends State<Contact> {
-  final Reactable<bool> playAnimation = false.asReactable;
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _message = TextEditingController();
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _message.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    if (!_formKey.currentState!.validate()) return;
+    sendEmail(
+      subject: 'Portfolio message from ${_name.text.trim()}',
+      body: '${_message.text.trim()}\n\n${_name.text.trim()} · ${_email.text.trim()}',
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      final maxWidth = constraints.maxWidth;
-      return VisibilityDetector(
-        key: const Key('contact'),
-        onVisibilityChanged: (visibilityInfo) {
-          double visiblePercentage = visibilityInfo.visibleFraction * 100;
-          if (visiblePercentage > 60 && !playAnimation.value) {
-            playAnimation.value = true;
-          }
-        },
-        child: Scope(builder: (context) {
-          return Stack(
-            children: [
-              Positioned(
-                  top: 100,
-                  right: 430,
-                  child: Container(
-                    width: 15,
-                    height: 15,
-                    decoration: BoxDecoration(
-                        color: CustomColors.purple,
-                        borderRadius: BorderRadius.circular(30)),
-                  )),
-              Positioned(
-                  bottom: 50,
-                  right: 630,
-                  child: Container(
-                    width: 15,
-                    height: 15,
-                    decoration: BoxDecoration(
-                        color: CustomColors.secondary,
-                        borderRadius: BorderRadius.circular(30)),
-                  )),
-              Positioned(
-                  bottom: 200,
-                  right: 900,
-                  child: Container(
-                    width: 15,
-                    height: 15,
-                    decoration: BoxDecoration(
-                        color: CustomColors.primary,
-                        borderRadius: BorderRadius.circular(30)),
-                  )),
-              SizedBox(
-                width: maxWidth,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                       horizontal: maxWidth >= Breakpoints.xxlg
-                    ? (maxWidth * Constants.mediumAndAboveHorizontalPaddingRatio)-0.05*maxWidth
-                    : (maxWidth * Constants.smallHorizontalPaddingRatio)-0.05*maxWidth
-                      ),
-                  child: maxWidth >= Breakpoints.xxlg
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            Container(
-                              width: 0.26*maxWidth,
-                              decoration: BoxDecoration(
-                                  color: CustomColors.brightBackground,
-                                  border: Border.all(
-                                      color: CustomColors.primary, width: 2),
-                                  borderRadius: const BorderRadius.all(
-                                      Radius.circular(20)),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                        spreadRadius: 0,
-                                        blurRadius: 8,
-                                        color: CustomColors.primary)
-                                  ]),
-                              child: Padding(
-                                padding: const EdgeInsets.all(40.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Get In Touch',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    const SizedBox(
-                                      height: 20,
-                                    ),
-                                    const Text(
-                                      'Contact.',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 35,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(
-                                      height: 30,
-                                    ),
-                                    SizedBox(
-                                      width: 450,
-                                      child: TextFormField(
-                                        decoration: const InputDecoration(
-                                            fillColor: CustomColors.textForm,
-                                            filled: true,
-                                            hintText: 'Email',
-                                            border: InputBorder.none,
-                                            enabledBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10))),
-                                            focusedBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10)))),
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 30,
-                                    ),
-                                    SizedBox(
-                                      width: 450,
-                                      child: TextFormField(
-                                        maxLines: 15,
-                                        decoration: const InputDecoration(
-                                            fillColor: CustomColors.textForm,
-                                            filled: true,
-                                            hintText: 'Message',
-                                            border: InputBorder.none,
-                                            enabledBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10))),
-                                            focusedBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10)))),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 25),
-                                    ElevatedButton(
-                                      onPressed: () {},
-                                      style: const ButtonStyle(
-                                        side: MaterialStatePropertyAll(
-                                            BorderSide(
-                                                color: CustomColors.primary)),
-                                        backgroundColor:
-                                            MaterialStatePropertyAll<Color>(
-                                                CustomColors.brightBackground),
-                                      ),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(15.0),
-                                        child: Text(
-                                          'Send',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                      ),
-                                    )
-                                  ],
-                                ),
-                              ),
-                            )
-                                .animate(target: playAnimation.value ? 1 : 0)
-                                .moveX(
-                                  begin:100 ,
-                                    end: 0,
-                                    curve: Curves.elasticOut,
-                                    duration: 1.seconds)
-                                .fadeIn(duration: 2.seconds),
-                                // SizedBox(width: 50,),
-                            SizedBox(
-                              width: 0.26*maxWidth,
-                              height: 0.26*maxWidth,
-                              child: const Planet()
-                                  .animate(target: playAnimation.value ? 1 : 0)
-                                  .moveX(
-                                     begin: -100,
-                                      end: 0,
-                                      curve: Curves.elasticOut,
-                                      duration: 1.seconds)
-                                  .fadeIn(duration: 2.seconds),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          // mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width:maxWidth<=Breakpoints.sm? 0.8*maxWidth:0.6*maxWidth,
-                                height:maxWidth<=Breakpoints.sm? 0.8*maxWidth:0.6*maxWidth,
-                              child: const Planet()
-                                  .animate(target: playAnimation.value ? 1 : 0)
-                                  .moveX(
-                                      begin: 100,
-                                      end: 0,
-                                      curve: Curves.elasticOut,
-                                      duration: 1.seconds)
-                                  .fadeIn(duration: 2.seconds),
-                            ),
-                            const SizedBox(
-                              height: 50,
-                            ),
-                            Container(
-                               width:maxWidth<=Breakpoints.sm? 0.8*maxWidth:0.6*maxWidth,
-                              decoration: BoxDecoration(
-                                  color: CustomColors.brightBackground,
-                                  border: Border.all(
-                                      color: CustomColors.primary, width: 2),
-                                  borderRadius: const BorderRadius.all(
-                                      Radius.circular(20)),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                        spreadRadius: 0,
-                                        blurRadius: 8,
-                                        color: CustomColors.primary)
-                                  ]),
-                              child: Padding(
-                                padding: const EdgeInsets.all(40.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    const Text(
-                                      'Get In Touch',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                    const SizedBox(
-                                      height: 20,
-                                    ),
-                                    const Text(
-                                      'Contact.',
-                                      style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 35,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(
-                                      height: 30,
-                                    ),
-                                    SizedBox(
-                                      width: 450,
-                                      child: TextFormField(
-                                        decoration: const InputDecoration(
-                                            fillColor: CustomColors.textForm,
-                                            filled: true,
-                                            hintText: 'Email',
-                                            border: InputBorder.none,
-                                            enabledBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10))),
-                                            focusedBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10)))),
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 30,
-                                    ),
-                                    SizedBox(
-                                      width: 450,
-                                      child: TextFormField(
-                                        maxLines: 15,
-                                        decoration: const InputDecoration(
-                                            fillColor: CustomColors.textForm,
-                                            filled: true,
-                                            hintText: 'Message',
-                                            border: InputBorder.none,
-                                            enabledBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10))),
-                                            focusedBorder: OutlineInputBorder(
-                                                borderSide: BorderSide.none,
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(10)))),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 25),
-                                    ElevatedButton(
-                                      onPressed: () {},
-                                      style: const ButtonStyle(
-                                        side: MaterialStatePropertyAll(
-                                            BorderSide(
-                                                color: CustomColors.primary)),
-                                        backgroundColor:
-                                            MaterialStatePropertyAll<Color>(
-                                                CustomColors.brightBackground),
-                                      ),
-                                      child: const Padding(
-                                        padding: EdgeInsets.all(15.0),
-                                        child: Text(
-                                          'Send',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                      ),
-                                    )
-                                  ],
-                                ),
-                              ),
-                            )
-                                .animate(target: playAnimation.value ? 1 : 0)
-                                .moveX(
-                                    begin: -100,
-                                    end: 0,
-                                    curve: Curves.elasticOut,
-                                    duration: 1.seconds)
-                                .fadeIn(duration: 2.seconds),
-                          ],
+    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final form = _form();
+    final planet = AspectRatio(aspectRatio: 1, child: const Planet());
+    return SectionFrame(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 120, bottom: 60),
+        child: ScrollProgress(builder: (context, p, _) {
+          final t = interval(p, 0.05, 0.35, Curves.easeOutCubic);
+          return Opacity(
+            opacity: t,
+            child: Transform.translate(
+              offset: Offset(0, 80 * (1 - t)),
+              child: wide
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(flex: 5, child: form),
+                        const SizedBox(width: 48),
+                        Expanded(flex: 4, child: planet),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: planet,
                         ),
-                ),
-              ),
-            ],
+                        const SizedBox(height: 32),
+                        form,
+                      ],
+                    ),
+            ),
           );
         }),
-      );
-    });
+      ),
+    );
+  }
+
+  Widget _form() {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: CustomColors.glass,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: CustomColors.primary.withValues(alpha: 0.35)),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SlashHeading(eyebrow: 'Get in touch', title: 'Contact.'),
+            const SizedBox(height: 28),
+            _field(_name, 'Your name', validator: _required),
+            const SizedBox(height: 18),
+            _field(_email, 'Your email', validator: (v) {
+              if (v == null || !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim())) {
+                return 'Enter a valid email';
+              }
+              return null;
+            }),
+            const SizedBox(height: 18),
+            _field(_message, 'What would you like to build?',
+                maxLines: 6, validator: _required),
+            const SizedBox(height: 26),
+            BladeButton(
+              label: 'Send',
+              icon: Icons.send_rounded,
+              filled: true,
+              onPressed: _send,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _required(String? v) =>
+      (v == null || v.trim().isEmpty) ? 'This field is required' : null;
+
+  Widget _field(TextEditingController controller, String hint,
+      {int maxLines = 1, String? Function(String?)? validator}) {
+    OutlineInputBorder border(Color color) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: color),
+        );
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      validator: validator,
+      style: const TextStyle(color: Colors.white),
+      cursorColor: CustomColors.primary,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
+        filled: true,
+        fillColor: CustomColors.textForm,
+        contentPadding: const EdgeInsets.all(18),
+        enabledBorder: border(Colors.white.withValues(alpha: 0.06)),
+        focusedBorder: border(CustomColors.primary),
+        errorBorder: border(CustomColors.secondary),
+        focusedErrorBorder: border(CustomColors.secondary),
+      ),
+    );
   }
 }

@@ -1,0 +1,6 @@
+# Read by Netlify and Cloudflare Pages. These headers make the page
+# cross-origin isolated, which lets Flutter's Wasm renderer (skwasm) draw on a
+# separate thread. Without them the site still works, just single-threaded.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp

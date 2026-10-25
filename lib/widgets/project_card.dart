@@ -1,111 +1,147 @@
 import 'package:flutter/material.dart';
 
+import '../data/portfolio_data.dart';
+import '../effects/tilt_card.dart';
+import '../utils/custom_colors.dart';
+import '../utils/launch.dart';
+import 'app_mockup.dart';
+
 class ProjectCard extends StatelessWidget {
-  const ProjectCard(
-      {super.key,
-      required this.image,
-      required this.title,
-      required this.description,
-      required this.githubOnPressed,
-      required this.openOnPressed});
-  final String image;
-  final String title;
-  final String description;
-  final VoidCallback githubOnPressed;
-  final VoidCallback openOnPressed;
+  const ProjectCard({super.key, required this.project, this.tilt = true});
+
+  final Project project;
+  final bool tilt;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context,constraints) {
-        double maxWidth=constraints.maxWidth;
-        return Container(
-            decoration: const BoxDecoration(
-                color: Color(0xff424346),
-                borderRadius: BorderRadius.all(Radius.circular(10)),
-                boxShadow: [
-                  BoxShadow(
-                      offset: Offset(0, 4),
-                      color: Colors.black,
-                      spreadRadius: 1,
-                      blurRadius: 10,
-                      blurStyle: BlurStyle.inner)
-                ]),
+    return TiltCard(
+      maxTilt: tilt ? 0.16 : 0,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 10,
+            child: AppMockup(project: project),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: maxWidth,
-                  height: maxWidth*0.7,
-                  decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(10),
-                          topLeft: Radius.circular(10)),
-                      image: DecorationImage(
-                          image: ExactAssetImage(image), fit: BoxFit.fill)),
+                Text(
+                  project.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(
-                  height: 30,
+                const SizedBox(height: 10),
+                Text(
+                  project.description,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 14.5,
+                    height: 1.5,
+                  ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final tag in project.tags)
+                      Text(
+                        '#$tag',
+                        style: TextStyle(
+                          color: CustomColors.primary.withValues(alpha: 0.9),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (project.github == null && project.url == null)
+                  const _PrivateNote()
+                else
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Text(title,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 25,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(
-                        height: 15,
-                      ),
-                      Text(description,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                          )),
-                      const SizedBox(
-                        height: 20,
-                      ),
-                      Row(
-                        children: [
-                          ElevatedButton(
-                              onPressed: openOnPressed,
-                              style: const ButtonStyle(
-                                  backgroundColor: MaterialStatePropertyAll(
-                                      Color(0xff424346)),
-                                  side: MaterialStatePropertyAll(
-                                      BorderSide(color: Color(0xff65F8AE)))),
-                              child: const Padding(
-                                padding: EdgeInsets.all(5.0),
-                                child: Text('Open',
-                                    style: TextStyle(
-                                        color: Colors.white, fontSize: 15)),
-                              )),
-                          const SizedBox(
-                            width: 15,
-                          ),
-                          ElevatedButton(
-                              onPressed: githubOnPressed,
-                              style: const ButtonStyle(
-                                  backgroundColor: MaterialStatePropertyAll(
-                                      Color(0xff424346)),
-                                  side: MaterialStatePropertyAll(
-                                      BorderSide(color: Color(0xff65F8AE)))),
-                              child: const Padding(
-                                padding: EdgeInsets.all(5.0),
-                                child: Text('Github',
-                                    style: TextStyle(
-                                        color: Colors.white, fontSize: 15)),
-                              ))
-                        ],
-                      )
+                      if (project.github case final github?)
+                        _LinkChip(
+                          icon: Icons.code_rounded,
+                          label: 'GitHub',
+                          onTap: () => openUrl(github),
+                        ),
+                      if (project.url case final url?)
+                        _LinkChip(
+                          icon: Icons.open_in_new_rounded,
+                          label: 'Open',
+                          onTap: () => openUrl(url),
+                        ),
                     ],
                   ),
-                )
               ],
-            ));
-      }
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivateNote extends StatelessWidget {
+  const _PrivateNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          Icons.lock_outline_rounded,
+          size: 16,
+          color: Colors.white.withValues(alpha: 0.5),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Private client project',
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.5),
+            fontSize: 13,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LinkChip extends StatelessWidget {
+  const _LinkChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: BorderSide(color: CustomColors.primary.withValues(alpha: 0.7)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      ),
     );
   }
 }

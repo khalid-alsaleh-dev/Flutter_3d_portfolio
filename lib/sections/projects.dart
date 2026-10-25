@@ -1,114 +1,117 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_3d_portfolio/utils/breakpoints.dart';
-import 'package:flutter_3d_portfolio/utils/constants.dart';
-import 'package:flutter_3d_portfolio/utils/image_assets.dart';
-import 'package:flutter_3d_portfolio/widgets/game.dart';
-import 'package:flutter_3d_portfolio/widgets/project_card.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'dart:math' as math;
 
-class Projects extends StatelessWidget {
-  const Projects({
-    super.key,
-  });
+import 'package:flutter/material.dart';
+
+import '../data/portfolio_data.dart';
+import '../effects/scroll_progress.dart';
+import '../effects/slash_heading.dart';
+import '../ninja_game/dojo.dart';
+import '../utils/custom_colors.dart';
+import '../widgets/project_card.dart';
+import '../widgets/section_frame.dart';
+
+class Projects extends StatefulWidget {
+  const Projects({super.key});
+
+  @override
+  State<Projects> createState() => _ProjectsState();
+}
+
+class _ProjectsState extends State<Projects> {
+  bool _listView = false;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      double maxWidth = constraints.maxWidth;
-      int crossAxisCount = 2;
-      if (maxWidth >= Breakpoints.xlg) {
-        crossAxisCount = 3;
-      } else if (maxWidth >= Breakpoints.lg) {
-        crossAxisCount = 2;
-      } else {
-        crossAxisCount = 1;
-      }
-      return Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: maxWidth >= Breakpoints.xxlg
-              ? 0
-              : maxWidth * Constants.smallHorizontalPaddingRatio,
-        ),
+    final width = MediaQuery.sizeOf(context).width;
+    final canPlay = width >= 1100;
+    final playing = canPlay && !_listView;
+    return SectionFrame(
+      maxWidth: 1400,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 120),
         child: Column(
-          crossAxisAlignment: maxWidth >= Breakpoints.xxlg
-              ? CrossAxisAlignment.center
-              : CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '.Use the Ninja to discover my projects.',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(
-              height: 10,
-            ),
-            const Text(
-              '.Each project is hidden behind a metal plate.',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(
-              height: 10,
-            ),
-            const Text(
-              '.Use the arrow buttons (left ⬅ and right ➡) to get colse to the chains, when you see they got red, use the control button to cut them🎇.',
-              style: TextStyle(color: Colors.white, fontSize: 16),
-            ),
-            const SizedBox(
-              height: 10,
-            ),
-            const Text(
-              'Some Of My Projects.',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold),
-            ),
-         maxWidth < Breakpoints.xxlg? const SizedBox(height: 15,):const SizedBox.shrink(),
-            maxWidth >= Breakpoints.xxlg
-                ? const SizedBox(
-                    width: double.infinity, height: 1000, child: Game())
-                : StaggeredGrid.count(
-                    crossAxisCount: crossAxisCount,
-                    mainAxisSpacing: 25,
-                    crossAxisSpacing: 25,
-                    children: [
-                      StaggeredGridTile.count(
-                          crossAxisCellCount: 1,
-                          mainAxisCellCount:crossAxisCount>=2? 1.3:1.2,
-                          child: ProjectCard(
-                            title: 'Flutter Brain Game',
-                            image: ImageAssets.flutterBrainGame,
-                            description:
-                                'A brain game built using only pure flutter animations(with no engines like flutter flame engine.',
-                            githubOnPressed: () {},
-                            openOnPressed: () {},
-                          )),
-                      StaggeredGridTile.count(
-                          crossAxisCellCount: 1,
-                         mainAxisCellCount:crossAxisCount>=2? 1.3:1.2,
-                          child: ProjectCard(
-                            title: 'Ethkrypto',
-                            image: ImageAssets.ethkrypto,
-                            description:
-                                'A web3.0 blockchain application to make ethereum transactions built using react typescript on the frontend and solidity for developing smart contracts.',
-                            githubOnPressed: () {},
-                            openOnPressed: () {},
-                          )),
-                      StaggeredGridTile.count(
-                          crossAxisCellCount: 1,
-                          mainAxisCellCount:crossAxisCount>=2? 1.3:1.2,
-                          child: ProjectCard(
-                            title: 'Al-labeeb YEP',
-                            image: ImageAssets.allabeebYep,
-                            description:
-                                'A flutter project built for deaf people to fill a document using the sign language.',
-                            githubOnPressed: () {},
-                            openOnPressed: () {},
-                          )),
-                    ],
+            const SlashHeading(eyebrow: 'My work', title: 'Projects.'),
+            const SizedBox(height: 20),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 16,
+              children: [
+                Text(
+                  playing
+                      ? 'Each project is sealed behind a metal plate. Walk the ninja up to a plate and cut its chains.'
+                      : 'A few things I have built.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 17,
                   ),
+                ),
+                if (canPlay)
+                  TextButton(
+                    onPressed: () => setState(() => _listView = !_listView),
+                    child: Text(
+                      _listView ? 'Play the dojo instead' : 'Just show me the list',
+                      style: const TextStyle(
+                        color: CustomColors.primary,
+                        decoration: TextDecoration.underline,
+                        decorationColor: CustomColors.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 36),
+            if (playing) const Dojo() else const _ProjectGrid(),
           ],
         ),
-      );
+      ),
+    );
+  }
+}
+
+class _ProjectGrid extends StatelessWidget {
+  const _ProjectGrid();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final cols = c.maxWidth >= 1200 ? 4 : (c.maxWidth >= 640 ? 2 : 1);
+      const gap = 24.0;
+      final cardWidth = (c.maxWidth - gap * (cols - 1)) / cols;
+      return ScrollProgress(builder: (context, p, _) {
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (var i = 0; i < PortfolioData.projects.length; i++)
+              _throwIn(
+                interval(p, 0.05 + i * 0.05, 0.3 + i * 0.05, Curves.easeOutCubic),
+                i,
+                SizedBox(
+                  width: cardWidth,
+                  child: ProjectCard(project: PortfolioData.projects[i]),
+                ),
+              ),
+          ],
+        );
+      });
     });
+  }
+
+  /// Cards arrive like thrown shuriken: spinning in from below.
+  Widget _throwIn(double t, int i, Widget child) {
+    return Opacity(
+      opacity: t.clamp(0.0, 1.0),
+      child: Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.001)
+          ..translateByDouble(0, 160 * (1 - t), 0, 1)
+          ..rotateZ((1 - t) * (i.isEven ? -0.3 : 0.3))
+          ..rotateX((1 - t) * math.pi / 3),
+        child: child,
+      ),
+    );
   }
 }
