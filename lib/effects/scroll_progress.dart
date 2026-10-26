@@ -55,16 +55,39 @@ class _ScrollProgressState extends State<ScrollProgress> {
     final travel = viewport + box.size.height;
     final p = ((viewport - top) / travel).clamp(0.0, 1.0);
     // A sub-pixel progress update has no visible effect, but it still causes
-    // the whole animated section to rebuild while the page is scrolling.
-    if ((p - _progress).abs() > 0.002) {
+    // the whole animated section to rebuild while the page is scrolling. The
+    // threshold is in pixels: a fixed fraction would be several pixels on a
+    // tall section, making scroll-linked motion step instead of glide.
+    if ((p - _progress).abs() * travel >= 0.5) {
       setState(() => _progress = p);
       widget.onProgress?.call(p);
     }
   }
 
   @override
-  Widget build(BuildContext context) =>
-      widget.builder(context, _progress, widget.child);
+  Widget build(BuildContext context) {
+    final forced = context
+        .dependOnInheritedWidgetOfExactType<ScrollProgressOverride>()
+        ?.progress;
+    return widget.builder(context, forced ?? _progress, widget.child);
+  }
+}
+
+/// Forces every [ScrollProgress] below it to report [progress] regardless of
+/// scrolling. Used to render sections mid-reveal off the normal page flow, for
+/// example to compile their GPU shaders ahead of time.
+class ScrollProgressOverride extends InheritedWidget {
+  const ScrollProgressOverride({
+    super.key,
+    required this.progress,
+    required super.child,
+  });
+
+  final double progress;
+
+  @override
+  bool updateShouldNotify(ScrollProgressOverride oldWidget) =>
+      oldWidget.progress != progress;
 }
 
 /// Remaps [t] from the [start]..[end] window into 0..1, clamped.

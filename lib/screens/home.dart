@@ -9,6 +9,7 @@ import '../effects/blade_background.dart';
 import '../effects/css_backdrop.dart';
 import '../effects/cursor_blade_trail.dart';
 import '../effects/ninja_duel.dart';
+import '../effects/shader_primer.dart';
 import '../sections/contact.dart';
 import '../sections/experience.dart';
 import '../sections/overview.dart';
@@ -53,7 +54,8 @@ class _HomeState extends State<Home> {
     // Fetch the (small) effect files once the first frame is up, so they are
     // ready the moment the visitor's first click unlocks audio.
     WidgetsBinding.instance.addPostFrameCallback(
-        (_) => Future.delayed(const Duration(seconds: 2), SoundFx.preload));
+      (_) => Future.delayed(const Duration(seconds: 2), SoundFx.preload),
+    );
   }
 
   void _onScroll() {
@@ -66,7 +68,8 @@ class _HomeState extends State<Home> {
     // The active section is the last one whose top has passed 40% of the view.
     var active = 0;
     for (var i = 0; i < _items.length; i++) {
-      final box = _items[i].key.currentContext?.findRenderObject() as RenderBox?;
+      final box =
+          _items[i].key.currentContext?.findRenderObject() as RenderBox?;
       if (box == null || !box.attached) continue;
       if (box.localToGlobal(Offset.zero).dy <= vh * 0.4) active = i;
     }
@@ -83,8 +86,11 @@ class _HomeState extends State<Home> {
   void _scrollTo(int i) {
     final ctx = _items[i].key.currentContext;
     if (ctx == null) return;
-    Scrollable.ensureVisible(ctx,
-        duration: 1200.ms, curve: Curves.easeInOutCubic);
+    Scrollable.ensureVisible(
+      ctx,
+      duration: 1200.ms,
+      curve: Curves.easeInOutCubic,
+    );
   }
 
   /// A key press also counts as the gesture browsers require for audio.
@@ -108,14 +114,18 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       // Transparent on web so the CSS sky and vignette show through.
-      backgroundColor:
-          CssBackdrop.supported ? Colors.transparent : CustomColors.darkBackground,
+      backgroundColor: CssBackdrop.supported
+          ? Colors.transparent
+          : CustomColors.darkBackground,
       body: CursorBladeTrail(
         pointer: _pointer,
         child: Stack(
           children: [
             Positioned.fill(
-              child: BladeBackground(controller: _controller, pointer: _pointer),
+              child: BladeBackground(
+                controller: _controller,
+                pointer: _pointer,
+              ),
             ),
             Positioned.fill(
               child: SingleChildScrollView(
@@ -126,7 +136,9 @@ class _HomeState extends State<Home> {
                     // animates (typewriter, duel, game) repaints only itself.
                     RepaintBoundary(
                       child: Welcome(
-                          key: _items[0].key, onSeeWork: () => _scrollTo(4)),
+                        key: _items[0].key,
+                        onSeeWork: () => _scrollTo(4),
+                      ),
                     ),
                     RepaintBoundary(child: Overview(key: _items[1].key)),
                     RepaintBoundary(child: Experience(key: _items[2].key)),
@@ -139,6 +151,9 @@ class _HomeState extends State<Home> {
                 ),
               ),
             ),
+            // Draws upcoming sections invisibly so their GPU shaders are
+            // compiled before the visitor scrolls to them (under the navbar).
+            const Positioned(top: 0, left: 0, child: ShaderPrimer()),
             Positioned(
               top: 0,
               left: 0,
@@ -170,8 +185,11 @@ class _HomeState extends State<Home> {
                   curve: Curves.easeOutBack,
                   child: _BackToTop(
                     progress: _progress,
-                    onTap: () => _controller.animateTo(0,
-                        duration: 1600.ms, curve: Curves.easeInOutCubic),
+                    onTap: () => _controller.animateTo(
+                      0,
+                      duration: 1600.ms,
+                      curve: Curves.easeInOutCubic,
+                    ),
                   ),
                 ),
               ),
@@ -203,7 +221,9 @@ class _BackToTop extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: CustomColors.glass,
-              border: Border.all(color: CustomColors.primary.withValues(alpha: 0.6)),
+              border: Border.all(
+                color: CustomColors.primary.withValues(alpha: 0.6),
+              ),
               boxShadow: [
                 BoxShadow(
                   color: CustomColors.primary.withValues(alpha: 0.3),

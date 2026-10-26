@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -312,78 +313,139 @@ class _BladePainter extends CustomPainter {
   // On web the CJK fallback font arrives after the first frames, so the cache
   // is also dropped whenever fonts finish loading; otherwise the first
   // "missing glyph" layout would stick.
-  static TextPainter? _kanji;
-  static (double, int)? _kanjiKey;
-  static void resetKanji() => _kanjiKey = null;
+  static ui.Image? _kanji;
+  static double? _kanjiHeight;
+  static void resetKanji() => _kanjiHeight = null;
+  static final Paint _kanjiPaint = Paint()..filterQuality = FilterQuality.low;
 
   void _paintKanji(Canvas canvas, Size size, double s) {
     final h = size.height;
     final fade = (1 - s / (h * 1.2)).clamp(0.0, 1.0);
     if (fade <= 0) return;
-    final step = (fade * 20).round();
-    if (_kanjiKey != (h, step)) {
-      _kanjiKey = (h, step);
-      _kanji?.dispose();
-      _kanji = TextPainter(
+    if (_kanjiHeight != h || _kanji == null) {
+      // A glyph this large is outside the text engine's glyph cache and gets
+      // re-rasterized from its outline every frame; as an image it is a
+      // single texture draw.
+      _kanjiHeight = h;
+      final tp = TextPainter(
         text: TextSpan(
           text: '忍',
           style: TextStyle(
             fontSize: h * 0.85,
             fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: 0.035 * step / 20),
+            color: Colors.white,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
+      final width = tp.width.ceil().clamp(1, 4096);
+      final height = tp.height.ceil().clamp(1, 4096);
+      final recorder = ui.PictureRecorder();
+      tp.paint(Canvas(recorder), Offset.zero);
+      tp.dispose();
+      _kanji?.dispose();
+      _kanji = recorder.endRecording().toImageSync(width, height);
     }
-    _kanji!.paint(canvas, Offset(size.width * 0.04, h * 0.05 - s * 0.35));
+    _kanjiPaint.color = Colors.white.withValues(alpha: 0.035 * fade);
+    canvas.drawImage(
+      _kanji!,
+      Offset(size.width * 0.04, h * 0.05 - s * 0.35),
+      _kanjiPaint,
+    );
+  }
+
+  // Petal and ember sprites, drawn once. Every particle is then a rotated,
+  // scaled, tinted copy of one of them, all submitted in one drawRawAtlas
+  // call. Separate drawOval/drawCircle calls cost ~280 JS-to-CanvasKit
+  // round trips per frame.
+  static ui.Image? _sprites;
+  static const _petalRect = Rect.fromLTWH(0, 0, 64, 32);
+  static const _emberRect = Rect.fromLTWH(64, 0, 64, 64);
+  static final Float32List _rst = Float32List(_petals.length * 4);
+  static final Float32List _rects = Float32List(_petals.length * 4);
+  static final Int32List _tints = Int32List(_petals.length);
+  static final Paint _spritePaint = Paint()..filterQuality = FilterQuality.low;
+
+  static ui.Image _bakeSprites() {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawOval(_petalRect.deflate(1), Paint()..color = Colors.white);
+    final c = _emberRect.center;
+    canvas.drawCircle(
+      c,
+      32,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          c,
+          32,
+          [
+            Colors.white,
+            Colors.white.withValues(alpha: 0.55),
+            Colors.white.withValues(alpha: 0.12),
+            Colors.white.withValues(alpha: 0),
+          ],
+          const [0, 0.3, 0.32, 1],
+        ),
+    );
+    return recorder.endRecording().toImageSync(128, 64);
   }
 
   void _paintPetals(Canvas canvas, Size size, double s) {
     final w = size.width, h = size.height;
     final t = scene.time;
-    final petal = Paint();
+    final sprites = _sprites ??= _bakeSprites();
     // During a fling the page is already moving quickly. Halving the ambient
     // particles in that short window keeps the expensive full-screen painter
     // from competing with the scroll rasterization.
     final limit = scene.velocity.abs() > 1600 ? 35 : _petals.length;
+    final span = h + 60;
     for (var i = 0; i < limit; i++) {
       final p = _petals[i];
-      final span = h + 60;
       final y =
           ((p.y * span + t * p.speed * 40 - s * p.depth * 0.5) % span + span) %
               span -
           30;
       final x = p.x * w + math.sin(t * p.speed + p.phase) * 40 * p.depth;
+      final double scale, angle, ax, ay;
+      final Rect src;
+      final Color tint;
       if (p.ember) {
         final glow = 0.5 + 0.5 * math.sin(t * 3 + p.phase);
-        // A soft halo plus a bright core reads as a glow without a blur pass.
-        petal.color = CustomColors.primary.withValues(
-          alpha: 0.12 * glow + 0.05,
-        );
-        canvas.drawCircle(Offset(x, y), p.size * 1.1, petal);
-        petal.color = CustomColors.primary.withValues(
-          alpha: 0.35 + 0.55 * glow,
-        );
-        canvas.drawCircle(Offset(x, y), p.size * 0.35, petal);
+        src = _emberRect;
+        scale = p.size * 2.2 / 64;
+        angle = 0;
+        ax = ay = 32;
+        tint = CustomColors.primary.withValues(alpha: 0.35 + 0.55 * glow);
       } else {
-        petal.color = const Color(
-          0xffff9fb6,
-        ).withValues(alpha: 0.35 + 0.4 * p.depth);
-        canvas.save();
-        canvas.translate(x, y);
-        canvas.rotate(t * p.speed + p.phase);
-        canvas.drawOval(
-          Rect.fromCenter(
-            center: Offset.zero,
-            width: p.size * 2,
-            height: p.size,
-          ),
-          petal,
-        );
-        canvas.restore();
+        src = _petalRect;
+        scale = p.size * 2 / 64;
+        angle = t * p.speed + p.phase;
+        ax = 32;
+        ay = 16;
+        tint = const Color(0xffff9fb6).withValues(alpha: 0.35 + 0.4 * p.depth);
       }
+      final scos = math.cos(angle) * scale, ssin = math.sin(angle) * scale;
+      _rst
+        ..[i * 4] = scos
+        ..[i * 4 + 1] = ssin
+        ..[i * 4 + 2] = x - scos * ax + ssin * ay
+        ..[i * 4 + 3] = y - ssin * ax - scos * ay;
+      _rects
+        ..[i * 4] = src.left
+        ..[i * 4 + 1] = src.top
+        ..[i * 4 + 2] = src.right
+        ..[i * 4 + 3] = src.bottom;
+      _tints[i] = tint.toARGB32();
     }
+    canvas.drawRawAtlas(
+      sprites,
+      Float32List.sublistView(_rst, 0, limit * 4),
+      Float32List.sublistView(_rects, 0, limit * 4),
+      Int32List.sublistView(_tints, 0, limit),
+      BlendMode.modulate,
+      null,
+      _spritePaint,
+    );
   }
 
   void _paintFlyers(Canvas canvas, Size size, double s, bool compact) {

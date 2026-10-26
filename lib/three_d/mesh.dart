@@ -39,17 +39,114 @@ class Mesh {
   int get faceCount => faceColors.length;
 }
 
-/// Paints [Mesh]es with a tiny software rasterizer: transform, cull, light,
+/// Lighting parameters for one [Material3d].
+class _Finish {
+  const _Finish(this.ambient, this.kd, this.ks, this.shininess, this.rim);
+  final double ambient, kd, ks, shininess, rim;
+}
+
+const _finishes = {
+  Material3d.steel: _Finish(0.28, 0.55, 1.0, 48, 0.3),
+  Material3d.gold: _Finish(0.3, 0.7, 0.7, 24, 0.25),
+  Material3d.cloth: _Finish(0.35, 0.65, 0.08, 6, 0.15),
+  Material3d.wood: _Finish(0.3, 0.7, 0.2, 10, 0.1),
+};
+
+/// A mesh flattened into typed arrays, plus scratch buffers reused every
+/// frame. Painting runs on every animation frame, so it must not allocate
+/// per-vertex or per-face objects.
+class _Compiled {
+  _Compiled(Mesh mesh)
+    : vertexCount = mesh.vertices.length,
+      faceCount = mesh.faceCount,
+      xyz = Float64List(mesh.vertices.length * 3),
+      index = Int32List.fromList(mesh.indices),
+      normal = Float64List(mesh.faceCount * 3),
+      rgb = Float64List(mesh.faceCount * 3),
+      alpha = Float64List(mesh.faceCount),
+      finish = List.generate(
+        mesh.faceCount,
+        (f) => _finishes[mesh.faceMaterials[f]],
+        growable: false,
+      ),
+      world = Float64List(mesh.vertices.length * 3),
+      screen = Float64List(mesh.vertices.length * 2),
+      depth = Float64List(mesh.faceCount),
+      order = List<int>.generate(mesh.faceCount, (i) => i),
+      shade = Int32List(mesh.faceCount),
+      positions = Float32List(mesh.faceCount * 6),
+      colors = Int32List(mesh.faceCount * 3) {
+    for (var i = 0; i < vertexCount; i++) {
+      final v = mesh.vertices[i];
+      xyz
+        ..[i * 3] = v.x
+        ..[i * 3 + 1] = v.y
+        ..[i * 3 + 2] = v.z;
+    }
+    for (var f = 0; f < faceCount; f++) {
+      final c = mesh.faceColors[f];
+      rgb
+        ..[f * 3] = c.r
+        ..[f * 3 + 1] = c.g
+        ..[f * 3 + 2] = c.b;
+      alpha[f] = c.a;
+      // Model-space face normal; rotations are applied per frame.
+      final a = index[f * 3] * 3,
+          b = index[f * 3 + 1] * 3,
+          cc = index[f * 3 + 2] * 3;
+      final ux = xyz[b] - xyz[a],
+          uy = xyz[b + 1] - xyz[a + 1],
+          uz = xyz[b + 2] - xyz[a + 2];
+      final vx = xyz[cc] - xyz[a],
+          vy = xyz[cc + 1] - xyz[a + 1],
+          vz = xyz[cc + 2] - xyz[a + 2];
+      var nx = uy * vz - uz * vy,
+          ny = uz * vx - ux * vz,
+          nz = ux * vy - uy * vx;
+      final len = math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (len > 0) {
+        nx /= len;
+        ny /= len;
+        nz /= len;
+      }
+      normal
+        ..[f * 3] = nx
+        ..[f * 3 + 1] = ny
+        ..[f * 3 + 2] = nz;
+    }
+  }
+
+  final int vertexCount, faceCount;
+  final Float64List xyz, normal, rgb, alpha;
+  final Int32List index;
+  final List<_Finish?> finish; // null = glow (unlit)
+  final Float64List world, screen, depth;
+  final List<int> order;
+  final Int32List shade;
+  final Float32List positions;
+  final Int32List colors;
+}
+
+/// Paints [Mesh]es with a tiny software rasterizer: transform, light,
 /// depth-sort, then hand all triangles to [Canvas.drawVertices] in one call.
 /// Works on every Flutter web renderer and needs no WebGL setup.
 class MeshPainter {
-  MeshPainter({Vector3? lightDirection, this.rimColor = const Color(0xff6AE99F)})
-      : light = (lightDirection ?? Vector3(-0.45, -0.7, 0.9))..normalize();
+  MeshPainter({
+    Vector3? lightDirection,
+    this.rimColor = const Color(0xff6AE99F),
+  }) : light = (lightDirection ?? Vector3(-0.45, -0.7, 0.9))..normalize() {
+    // Half vector between the light and a viewer looking down -z.
+    final hx = light.x, hy = light.y, hz = light.z + 1;
+    final hl = math.sqrt(hx * hx + hy * hy + hz * hz);
+    _half = Vector3(hx / hl, hy / hl, hz / hl);
+  }
 
   final Vector3 light;
+  late final Vector3 _half;
   final Color rimColor;
 
   static final Paint _paint = Paint()..isAntiAlias = true;
+  static final Expando<_Compiled> _compiled = Expando('compiled mesh');
 
   /// Draws [mesh] transformed by [model] around [center] on the canvas.
   /// [scale] converts model units into logical pixels and [focal] controls how
@@ -64,113 +161,104 @@ class MeshPainter {
     double opacity = 1,
   }) {
     if (opacity <= 0.01) return;
-    final n = mesh.vertices.length;
-    final world = List<Vector3>.generate(
-        n, (i) => model.transformed3(mesh.vertices[i]),
-        growable: false);
-    final projected = List<Offset>.generate(n, (i) {
-      final v = world[i];
-      final p = focal / (focal - v.z).clamp(0.2, double.infinity);
-      return Offset(center.dx + v.x * scale * p, center.dy - v.y * scale * p);
-    }, growable: false);
+    final m = _compiled[mesh] ??= _Compiled(mesh);
+    final s = model.storage; // column-major
+    final cx = center.dx, cy = center.dy;
 
-    final faces = <_Face>[];
-    final view = Vector3(0, 0, 1);
-    for (var f = 0; f < mesh.faceCount; f++) {
-      final ia = mesh.indices[f * 3];
-      final ib = mesh.indices[f * 3 + 1];
-      final ic = mesh.indices[f * 3 + 2];
-      final a = projected[ia], b = projected[ib], c = projected[ic];
-      // Screen-space winding: y is flipped, so front faces are clockwise.
-      final cross =
-          (b.dx - a.dx) * (c.dy - a.dy) - (b.dy - a.dy) * (c.dx - a.dx);
-      final wa = world[ia], wb = world[ib], wc = world[ic];
-      final normal = (wb - wa).cross(wc - wa);
-      if (normal.length2 == 0) continue;
-      normal.normalize();
-      final facing = cross < 0;
-      // Thin blades are rendered double sided so edges never vanish.
-      if (!facing) normal.negate();
-      final depth = (wa.z + wb.z + wc.z) / 3;
-      faces.add(_Face(a, b, c, depth,
-          _shade(mesh.faceColors[f], mesh.faceMaterials[f], normal, view)));
+    // Transform and project every vertex.
+    final xyz = m.xyz, world = m.world, screen = m.screen;
+    for (var i = 0; i < m.vertexCount; i++) {
+      final x = xyz[i * 3], y = xyz[i * 3 + 1], z = xyz[i * 3 + 2];
+      final wx = s[0] * x + s[4] * y + s[8] * z + s[12];
+      final wy = s[1] * x + s[5] * y + s[9] * z + s[13];
+      final wz = s[2] * x + s[6] * y + s[10] * z + s[14];
+      world
+        ..[i * 3] = wx
+        ..[i * 3 + 1] = wy
+        ..[i * 3 + 2] = wz;
+      final d = focal - wz;
+      final p = focal / (d < 0.2 ? 0.2 : d);
+      screen
+        ..[i * 2] = cx + wx * scale * p
+        ..[i * 2 + 1] = cy - wy * scale * p;
     }
-    faces.sort((x, y) => x.depth.compareTo(y.depth));
 
-    final positions = Float32List(faces.length * 6);
-    final colors = Int32List(faces.length * 3);
-    for (var i = 0; i < faces.length; i++) {
-      final face = faces[i];
+    // Light each face and record its depth.
+    final index = m.index, normal = m.normal, depth = m.depth, shade = m.shade;
+    final lx = light.x, ly = light.y, lz = light.z;
+    final hx = _half.x, hy = _half.y, hz = _half.z;
+    final rr = rimColor.r, rg = rimColor.g, rb = rimColor.b;
+    for (var f = 0; f < m.faceCount; f++) {
+      final a = index[f * 3], b = index[f * 3 + 1], c = index[f * 3 + 2];
+      depth[f] = (world[a * 3 + 2] + world[b * 3 + 2] + world[c * 3 + 2]) / 3;
+      final alpha = (m.alpha[f] * opacity * 255).round().clamp(0, 255);
+      final finish = m.finish[f];
+      if (finish == null) {
+        shade[f] =
+            (alpha << 24) |
+            ((m.rgb[f * 3] * 255).round() << 16) |
+            ((m.rgb[f * 3 + 1] * 255).round() << 8) |
+            (m.rgb[f * 3 + 2] * 255).round();
+        continue;
+      }
+      // Rotate the model-space normal into the world (models use rotation
+      // only, so the upper 3x3 of the matrix is enough).
+      final ox = normal[f * 3], oy = normal[f * 3 + 1], oz = normal[f * 3 + 2];
+      var nx = s[0] * ox + s[4] * oy + s[8] * oz;
+      var ny = s[1] * ox + s[5] * oy + s[9] * oz;
+      var nz = s[2] * ox + s[6] * oy + s[10] * oz;
+      // Double sided: light whichever side faces the viewer, so thin blades
+      // never go black.
+      final ax = screen[a * 2], ay = screen[a * 2 + 1];
+      final cross =
+          (screen[b * 2] - ax) * (screen[c * 2 + 1] - ay) -
+          (screen[b * 2 + 1] - ay) * (screen[c * 2] - ax);
+      if (cross >= 0) {
+        nx = -nx;
+        ny = -ny;
+        nz = -nz;
+      }
+      final diffuse = math.max(0.0, nx * lx + ny * ly + nz * lz);
+      final specAngle = math.max(0.0, nx * hx + ny * hy + nz * hz);
+      final facingViewer = 1 - math.max(0.0, nz);
+      final rim = facingViewer * facingViewer * finish.rim;
+      final spec = finish.ks * math.pow(specAngle, finish.shininess);
+      final lit = finish.ambient + finish.kd * diffuse;
+      int ch(double base, double rimC) =>
+          ((base * lit + spec + rimC * rim).clamp(0.0, 1.0) * 255).round();
+      shade[f] =
+          (alpha << 24) |
+          (ch(m.rgb[f * 3], rr) << 16) |
+          (ch(m.rgb[f * 3 + 1], rg) << 8) |
+          ch(m.rgb[f * 3 + 2], rb);
+    }
+
+    // Painter's algorithm: far faces first.
+    m.order.sort((x, y) => depth[x].compareTo(depth[y]));
+
+    final positions = m.positions, colors = m.colors;
+    for (var i = 0; i < m.faceCount; i++) {
+      final f = m.order[i];
+      final a = index[f * 3], b = index[f * 3 + 1], c = index[f * 3 + 2];
       positions
-        ..[i * 6] = face.a.dx
-        ..[i * 6 + 1] = face.a.dy
-        ..[i * 6 + 2] = face.b.dx
-        ..[i * 6 + 3] = face.b.dy
-        ..[i * 6 + 4] = face.c.dx
-        ..[i * 6 + 5] = face.c.dy;
-      final argb = face.color.withValues(alpha: face.color.a * opacity).toARGB32();
+        ..[i * 6] = screen[a * 2]
+        ..[i * 6 + 1] = screen[a * 2 + 1]
+        ..[i * 6 + 2] = screen[b * 2]
+        ..[i * 6 + 3] = screen[b * 2 + 1]
+        ..[i * 6 + 4] = screen[c * 2]
+        ..[i * 6 + 5] = screen[c * 2 + 1];
+      final argb = shade[f];
       colors
         ..[i * 3] = argb
         ..[i * 3 + 1] = argb
         ..[i * 3 + 2] = argb;
     }
-    final vertices =
-        Vertices.raw(VertexMode.triangles, positions, colors: colors);
+    final vertices = Vertices.raw(
+      VertexMode.triangles,
+      positions,
+      colors: colors,
+    );
     canvas.drawVertices(vertices, BlendMode.dst, _paint);
     vertices.dispose();
   }
-
-  Color _shade(Color base, Material3d material, Vector3 normal, Vector3 view) {
-    final diffuse = math.max(0.0, normal.dot(light));
-    final half = (light + view)..normalize();
-    final specAngle = math.max(0.0, normal.dot(half));
-    final rim = math.pow(1 - math.max(0.0, normal.dot(view)), 2).toDouble();
-
-    double ambient, kd, ks, shininess, rimStrength;
-    switch (material) {
-      case Material3d.steel:
-        ambient = 0.28;
-        kd = 0.55;
-        ks = 1.0;
-        shininess = 48;
-        rimStrength = 0.3;
-      case Material3d.gold:
-        ambient = 0.3;
-        kd = 0.7;
-        ks = 0.7;
-        shininess = 24;
-        rimStrength = 0.25;
-      case Material3d.cloth:
-        ambient = 0.35;
-        kd = 0.65;
-        ks = 0.08;
-        shininess = 6;
-        rimStrength = 0.15;
-      case Material3d.wood:
-        ambient = 0.3;
-        kd = 0.7;
-        ks = 0.2;
-        shininess = 10;
-        rimStrength = 0.1;
-      case Material3d.glow:
-        return base;
-    }
-    final spec = ks * math.pow(specAngle, shininess).toDouble();
-    final lit = ambient + kd * diffuse;
-    double ch(double c, double rimC) =>
-        (c * lit + spec + rimC * rim * rimStrength).clamp(0.0, 1.0);
-    return Color.from(
-      alpha: base.a,
-      red: ch(base.r, rimColor.r),
-      green: ch(base.g, rimColor.g),
-      blue: ch(base.b, rimColor.b),
-    );
-  }
-}
-
-class _Face {
-  _Face(this.a, this.b, this.c, this.depth, this.color);
-  final Offset a, b, c;
-  final double depth;
-  final Color color;
 }
