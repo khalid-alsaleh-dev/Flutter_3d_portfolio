@@ -11,6 +11,7 @@ import '../three_d/mesh.dart';
 import '../three_d/mesh_projection.dart';
 import '../three_d/models.dart';
 import '../utils/custom_colors.dart';
+import 'slash_heading.dart';
 import 'css_backdrop.dart';
 
 /// The fixed, full-screen layer behind the whole page.
@@ -38,13 +39,13 @@ class BladeBackground extends StatefulWidget {
 class _BladeBackgroundState extends State<BladeBackground>
     with SingleTickerProviderStateMixin {
   late final Ticker _ticker;
-  final _frame = ValueNotifier<int>(0);
-  final _scene = _SceneState();
+  ValueNotifier<int> get _frame => _BladeShared.frame;
+  _SceneState get _scene => _BladeShared.scene;
   Duration _last = Duration.zero;
   double _sincePaint = 0;
   double _sinceInput = 0;
   Offset? _lastPointer;
-  double _lastScreens = 0;
+  final Map<Object, double> _lastSlice = {};
 
   /// When nothing is moving (no scroll, no pointer, no slash trail) the
   /// ambient petals and spinning blades only need 30 fps. Every frame on web
@@ -69,15 +70,24 @@ class _BladeBackgroundState extends State<BladeBackground>
     final scrolled = offset != _scene.offset;
     _scene.advance(dt, offset, extent);
 
-    // The hero katana's slash swings through at ~0.2 screens of scroll.
-    final viewport = c.hasClients && c.position.hasViewportDimension
-        ? c.position.viewportDimension
-        : 1.0;
-    final screens = offset / viewport;
-    if (_lastScreens < 0.2 && screens >= 0.2 && screens - _lastScreens < 0.5) {
-      SoundFx.play(SoundFx.sword, volume: 0.7);
+    // A whoosh each time the katana starts slicing a section title (forward
+    // scrolling only; a nav jump past a title stays silent).
+    if (scrolled) {
+      final viewport = c.hasClients && c.position.hasViewportDimension
+          ? c.position.viewportDimension
+          : 1.0;
+      for (final target in SlashTargets.visible(viewport)) {
+        final last = _lastSlice[target.id];
+        const cue = SlashTargets.approachEnd;
+        if (last != null &&
+            last < cue &&
+            target.progress >= cue &&
+            target.progress - last < 0.15) {
+          SoundFx.play(SoundFx.sword, volume: 0.7);
+        }
+        _lastSlice[target.id] = target.progress;
+      }
     }
-    _lastScreens = screens;
 
     final pointer = widget.pointer.value;
     if (scrolled || pointer != _lastPointer || _scene.tipTrail.isNotEmpty) {
@@ -101,7 +111,6 @@ class _BladeBackgroundState extends State<BladeBackground>
       _BladePainter.resetKanji,
     );
     _ticker.dispose();
-    _frame.dispose();
     super.dispose();
   }
 
@@ -114,6 +123,39 @@ class _BladeBackgroundState extends State<BladeBackground>
       ),
     );
   }
+}
+
+/// The katana while it slices a section title, drawn above the page content
+/// so the blade cuts in front of the word. The rest of the time the katana is
+/// drawn by [BladeBackground], behind the content, so the parked blade never
+/// covers cards or text. Both share one scene and frame clock.
+class BladeFront extends StatelessWidget {
+  const BladeFront({super.key, required this.pointer});
+
+  final ValueNotifier<Offset?> pointer;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _BladePainter(
+            _BladeShared.scene,
+            pointer,
+            _BladeShared.frame,
+            front: true,
+          ),
+          size: Size.infinite,
+        ),
+      ),
+    );
+  }
+}
+
+/// State shared by [BladeBackground] (which ticks it) and [BladeFront].
+class _BladeShared {
+  static final frame = ValueNotifier<int>(0);
+  static final scene = _SceneState();
 }
 
 /// Simulation state that survives between frames.
@@ -139,6 +181,24 @@ class _SceneState {
     }
     tipTrail.removeWhere((t) => t.age > 0.35);
   }
+}
+
+/// Position, size and rotation of the katana; poses are blended as it flies
+/// between resting and slicing.
+class _Pose {
+  const _Pose(this.center, this.unit, this.rz, this.ry, this.rx);
+  final Offset center;
+  final double unit, rz, ry, rx;
+
+  _Pose shifted(Offset by) => _Pose(center + by, unit, rz, ry, rx);
+
+  static _Pose lerp(_Pose a, _Pose b, double t) => _Pose(
+    Offset.lerp(a.center, b.center, t)!,
+    ui.lerpDouble(a.unit, b.unit, t)!,
+    ui.lerpDouble(a.rz, b.rz, t)!,
+    ui.lerpDouble(a.ry, b.ry, t)!,
+    ui.lerpDouble(a.rx, b.rx, t)!,
+  );
 }
 
 class _Trail {
@@ -167,11 +227,18 @@ class _Flyer {
 }
 
 class _BladePainter extends CustomPainter {
-  _BladePainter(this.scene, this.pointer, Listenable repaint)
-    : super(repaint: repaint);
+  _BladePainter(
+    this.scene,
+    this.pointer,
+    Listenable repaint, {
+    this.front = false,
+  }) : super(repaint: repaint);
 
   final _SceneState scene;
   final ValueNotifier<Offset?> pointer;
+
+  /// Front layer: only the katana, and only while it slices a title.
+  final bool front;
 
   static final _steel = MeshPainter();
   static final _crimson = MeshPainter(rimColor: CustomColors.secondary);
@@ -207,6 +274,10 @@ class _BladePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (front) {
+      _paintHeroKatana(canvas, size, scene.offset, size.width < 900);
+      return;
+    }
     final w = size.width, h = size.height;
     final s = scene.offset;
     final page = s / scene.extent; // 0..1 through the whole page
@@ -488,15 +559,6 @@ class _BladePainter extends CustomPainter {
   void _paintHeroKatana(Canvas canvas, Size size, double s, bool compact) {
     final w = size.width, h = size.height;
     final t = scene.time;
-    final vh = s / h;
-
-    // 0..1 phases of the katana's choreography.
-    final slash = Curves.easeInOutCubic.transform(
-      ((vh - 0.05) / 0.6).clamp(0.0, 1.0),
-    );
-    final park = Curves.easeInOutCubic.transform(
-      ((vh - 0.65) / 0.55).clamp(0.0, 1.0),
-    );
 
     final pointerOffset = pointer.value;
     final tiltX = pointerOffset == null
@@ -506,45 +568,88 @@ class _BladePainter extends CustomPainter {
         ? 0.0
         : (pointerOffset.dx / w - 0.5) * 0.8;
 
-    final heroCenter = compact
-        ? Offset(w * 0.5, h * 0.72)
-        : Offset(w * 0.68, h * 0.55);
-    final slashEnd = Offset(w * 0.32, h * 0.42);
-    final parkSpot = compact
-        ? Offset(w - 26, h * 0.5)
-        : Offset(w - 70, h * 0.52);
-
-    final center = Offset.lerp(
-      Offset.lerp(heroCenter, slashEnd, slash)!,
-      parkSpot,
-      park,
-    )!.translate(0, math.sin(t * 1.3) * 10 * (1 - park));
-    final baseUnit = math.min(w, h) * (compact ? 0.11 : 0.12);
-    final unit = ui.lerpDouble(
-      ui.lerpDouble(baseUnit, baseUnit * 1.35, math.sin(slash * math.pi))!,
-      baseUnit * (compact ? 0.4 : 0.5),
-      park,
-    )!;
-
-    final rz = ui.lerpDouble(
-      ui.lerpDouble(0.55 + 0.06 * math.sin(t), -2.6, slash)!,
+    // Resting pose: floating beside the hero, easing to a small parked blade
+    // on the right that spins on its axis as the page scrolls.
+    final heroUnit = math.min(w, h) * (compact ? 0.11 : 0.12);
+    final hero = _Pose(
+      compact ? Offset(w * 0.5, h * 0.72) : Offset(w * 0.68, h * 0.55),
+      heroUnit,
+      0.55 + 0.06 * math.sin(t),
+      0.5 * math.sin(t * 0.45) + tiltY,
+      t * 0.6 + tiltX,
+    ).shifted(Offset(0, math.sin(t * 1.3) * 10));
+    final parked = _Pose(
+      compact ? Offset(w - 26, h * 0.5) : Offset(w - 70, h * 0.52),
+      heroUnit * (compact ? 0.4 : 0.5),
       math.pi / 2,
-      park,
-    )!;
-    final ry = ui.lerpDouble(0.5 * math.sin(t * 0.45) + tiltY, 0, park)!;
-    final rx = t * 0.6 * (1 - park) + s * 0.012 * park + tiltX;
+      0,
+      s * 0.012 + tiltX,
+    );
+    final rest = _Pose.lerp(
+      hero,
+      parked,
+      Curves.easeInOutCubic.transform(((s / h - 0.02) / 0.45).clamp(0.0, 1.0)),
+    );
+
+    // Slicing a section title takes over whenever one is in its window.
+    var pose = rest;
+    var slicing = 0.0;
+    final target = _activeTarget(h);
+    if (target != null) {
+      final a = target.cutStart, b = target.cutEnd;
+      final along = b - a;
+      final dir = along / along.distance;
+      // The cut rises to the right; in model space +y is up, so the blade's
+      // roll is the cut's angle with the screen's y axis flipped.
+      final angle = math.atan2(-along.dy, along.dx);
+      final unit = (target.title.width * 0.8 / 5.8).clamp(
+        compact ? 18.0 : 26.0,
+        compact ? 48.0 : 82.0,
+      );
+      final half = 2.9 * unit;
+      // The whole blade passes over the title, tip first.
+      final from = _Pose(a - dir * half, unit, angle + 0.25, 0, 0);
+      final to = _Pose(b + dir * half, unit, angle - 0.25, 0, 2.6);
+      final p = target.progress;
+      if (p < SlashTargets.approachEnd) {
+        final k = Curves.easeInOutCubic.transform(
+          (p / SlashTargets.approachEnd).clamp(0.0, 1.0),
+        );
+        pose = _Pose.lerp(rest, from, k);
+        slicing = k;
+      } else if (p < SlashTargets.sweepEnd) {
+        final k = Curves.easeInOut.transform(
+          (p - SlashTargets.approachEnd) /
+              (SlashTargets.sweepEnd - SlashTargets.approachEnd),
+        );
+        pose = _Pose.lerp(from, to, k);
+        slicing = 1;
+      } else {
+        final k = Curves.easeInOutCubic.transform(
+          ((p - SlashTargets.sweepEnd) /
+                  (SlashTargets.exitEnd - SlashTargets.sweepEnd))
+              .clamp(0.0, 1.0),
+        );
+        pose = _Pose.lerp(to, rest, k);
+        slicing = 1 - k;
+      }
+    }
+
+    // Slicing: drawn by the front layer, over the title. Otherwise: drawn
+    // here, behind the content.
+    if ((slicing > 0) != front) return;
 
     final model = Matrix4.identity()
-      ..rotateZ(rz)
-      ..rotateY(ry)
-      ..rotateX(rx);
+      ..rotateZ(pose.rz)
+      ..rotateY(pose.ry)
+      ..rotateX(pose.rx);
 
     // Slash trail from the tip of the blade.
     final tip = projectPoint(
       _katanaTip,
       model,
-      center: center,
-      scale: unit,
+      center: pose.center,
+      scale: pose.unit,
       focal: 9,
     );
     if (scene.tipTrail.isEmpty ||
@@ -553,13 +658,15 @@ class _BladePainter extends CustomPainter {
     }
     _paintTrail(canvas, scene.tipTrail);
 
-    // Glow under the blade.
+    // Glow under the blade: strongest on the hero and while slicing.
+    final restGlow = 1 - ((s / h) / 0.45).clamp(0.0, 1.0) * 0.6;
+    final glow = math.max(restGlow, slicing);
     canvas.drawCircle(
-      center,
-      unit * 2.2,
+      pose.center,
+      pose.unit * 2.2,
       Paint()
-        ..shader = ui.Gradient.radial(center, unit * 2.2, [
-          CustomColors.primary.withValues(alpha: 0.12 * (1 - park * 0.6)),
+        ..shader = ui.Gradient.radial(pose.center, pose.unit * 2.2, [
+          CustomColors.primary.withValues(alpha: 0.12 * glow),
           Colors.transparent,
         ]),
     );
@@ -567,11 +674,29 @@ class _BladePainter extends CustomPainter {
       canvas,
       Models.katana,
       model,
-      center: center,
-      scale: unit,
+      center: pose.center,
+      scale: pose.unit,
       focal: 9,
-      opacity: compact && park > 0.5 ? 0.6 : 1,
+      // On phones the parked blade sits over content, so it is dimmed there.
+      opacity: compact
+          ? ui.lerpDouble(
+              0.6,
+              1,
+              math.max(slicing, 1 - (s / h).clamp(0.0, 1.0)),
+            )!
+          : 1,
     );
+  }
+
+  /// The section title the katana should be slicing, if any: the one whose
+  /// slice is in progress (approach, sweep or exit).
+  static SlashTarget? _activeTarget(double viewport) {
+    SlashTarget? best;
+    for (final target in SlashTargets.visible(viewport)) {
+      if (target.progress >= SlashTargets.exitEnd) continue;
+      if (best == null || target.progress > best.progress) best = target;
+    }
+    return best;
   }
 
   void _paintTrail(Canvas canvas, List<_Trail> trail) {

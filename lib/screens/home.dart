@@ -151,6 +151,8 @@ class _HomeState extends State<Home> {
                 ),
               ),
             ),
+            // The katana while it slices a section title, over the content.
+            Positioned.fill(child: BladeFront(pointer: _pointer)),
             // Draws upcoming sections invisibly so their GPU shaders are
             // compiled before the visitor scrolls to them (under the navbar).
             const Positioned(top: 0, left: 0, child: ShaderPrimer()),
