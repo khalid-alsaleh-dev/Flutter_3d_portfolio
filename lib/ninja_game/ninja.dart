@@ -128,6 +128,8 @@ class Ninja extends SpriteAnimationComponent
     _attackLeft = _attackTime;
     _slashed = false;
     _show(_Move.attack);
+    // Sound on the key press itself, not when the blade lands mid-swing.
+    SoundFx.play(SoundFx.sword, volume: 0.7);
   }
 
   @override

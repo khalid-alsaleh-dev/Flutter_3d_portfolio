@@ -130,10 +130,9 @@ class NinjaGame extends FlameGame with KeyboardEvents {
   /// Called by the ninja at the moment the blade connects.
   void onSlash() {
     final i = armed.value;
-    if (i == null || cut[i].value) {
-      SoundFx.play(SoundFx.sword);
-      return;
-    }
+    // The swing's whoosh already played on the key press; only a hit adds
+    // the chain-cut sound, at the moment of impact.
+    if (i == null || cut[i].value) return;
     cut[i].value = true;
     SoundFx.play(SoundFx.cut);
     _sparks(Vector2(plateX(i), ninja.y - ninja.size.y * 0.6));

@@ -1,18 +1,25 @@
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/foundation.dart';
 
+import 'sfx_backend_stub.dart'
+    if (dart.library.js_interop) 'sfx_backend_web.dart'
+    as web_audio;
+
 /// Site-wide sound effects and the dojo soundtrack.
 ///
 /// Sound is on by default, but browsers refuse to play audio until the visitor
 /// has clicked, tapped or pressed a key (scrolling does not count). Until
 /// [unlock] is called from such a gesture, every request is silently dropped.
 /// Downloading needs no gesture, so [preload] fetches everything up front.
-/// Effects use pooled players so rapid sword clashes don't pile up new
-/// `<audio>` elements.
+///
+/// On the web, effects play through the Web Audio API (decoded once, started
+/// in a few milliseconds, freely overlapping). Elsewhere they use pooled
+/// players. The effect files are trimmed to start on their first sound: any
+/// leading silence is heard as lag between an action and its sound.
 class SoundFx {
   static const jump = 'jump.wav';
   static const sword = 'sword.wav';
-  static const cut = 'cut_the_chain.mp3';
+  static const cut = 'cut_the_chain.wav';
   static const _soundtrack = 'ninja_sound_track.mp3';
 
   /// The visitor's preference.
@@ -32,15 +39,22 @@ class SoundFx {
   /// Downloads and prepares every effect in parallel, so the first sound after
   /// unlocking plays immediately. Safe to call more than once.
   static Future<void> preload() => _preloading ??= Future.wait([
-        _loadPool(jump, 2),
-        _loadPool(sword, 4),
-        _loadPool(cut, 2),
-      ]);
+    _load(jump, 2),
+    _load(sword, 4),
+    _load(cut, 2),
+  ]);
 
-  static Future<void> _loadPool(String file, int maxPlayers) async {
+  static Future<void> _load(String file, int maxPlayers) async {
     try {
-      _pools[file] = await FlameAudio.createPool(file,
-          maxPlayers: maxPlayers, minPlayers: 1);
+      if (web_audio.supported) {
+        await web_audio.load(file);
+      } else {
+        _pools[file] = await FlameAudio.createPool(
+          file,
+          maxPlayers: maxPlayers,
+          minPlayers: 1,
+        );
+      }
     } catch (e) {
       debugPrint('Sound "$file" unavailable: $e');
     }
@@ -48,6 +62,9 @@ class SoundFx {
 
   /// Call from inside a user gesture handler.
   static void unlock() {
+    // Every gesture retries resuming the audio context, in case an earlier
+    // attempt happened outside one.
+    web_audio.unlock();
     if (unlocked.value) return;
     unlocked.value = true;
     preload();
@@ -64,6 +81,10 @@ class SoundFx {
 
   static void play(String file, {double volume = 0.8}) {
     if (!audible) return;
+    if (web_audio.supported) {
+      web_audio.play(file, volume);
+      return;
+    }
     _pools[file]?.start(volume: volume).catchError((Object e) {
       debugPrint('Sound "$file" failed: $e');
       return () async {};
