@@ -7,11 +7,15 @@ import 'package:flutter/material.dart';
 /// This is what makes every scroll-scrubbed animation on the page reversible:
 /// scroll back up and the animation plays backwards.
 class ScrollProgress extends StatefulWidget {
-  const ScrollProgress(
-      {super.key, required this.builder, this.child, this.onProgress});
+  const ScrollProgress({
+    super.key,
+    required this.builder,
+    this.child,
+    this.onProgress,
+  });
 
   final Widget Function(BuildContext context, double progress, Widget? child)
-      builder;
+  builder;
   final Widget? child;
 
   /// Called whenever the progress changes, for side effects such as sounds.
@@ -50,7 +54,9 @@ class _ScrollProgressState extends State<ScrollProgress> {
     final top = box.localToGlobal(Offset.zero).dy;
     final travel = viewport + box.size.height;
     final p = ((viewport - top) / travel).clamp(0.0, 1.0);
-    if ((p - _progress).abs() > 0.0005) {
+    // A sub-pixel progress update has no visible effect, but it still causes
+    // the whole animated section to rebuild while the page is scrolling.
+    if ((p - _progress).abs() > 0.002) {
       setState(() => _progress = p);
       widget.onProgress?.call(p);
     }
@@ -62,7 +68,12 @@ class _ScrollProgressState extends State<ScrollProgress> {
 }
 
 /// Remaps [t] from the [start]..[end] window into 0..1, clamped.
-double interval(double t, double start, double end, [Curve curve = Curves.linear]) {
+double interval(
+  double t,
+  double start,
+  double end, [
+  Curve curve = Curves.linear,
+]) {
   if (end <= start) return t >= end ? 1 : 0;
   return curve.transform(((t - start) / (end - start)).clamp(0.0, 1.0));
 }

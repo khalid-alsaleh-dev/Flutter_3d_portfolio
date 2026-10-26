@@ -21,8 +21,11 @@ import 'css_backdrop.dart';
 ///   scroll velocity;
 /// * a moon, drifting sakura petals, embers and speed lines.
 class BladeBackground extends StatefulWidget {
-  const BladeBackground(
-      {super.key, required this.controller, required this.pointer});
+  const BladeBackground({
+    super.key,
+    required this.controller,
+    required this.pointer,
+  });
 
   final ScrollController controller;
   final ValueNotifier<Offset?> pointer;
@@ -93,8 +96,9 @@ class _BladeBackgroundState extends State<BladeBackground>
 
   @override
   void dispose() {
-    PaintingBinding.instance.systemFonts
-        .removeListener(_BladePainter.resetKanji);
+    PaintingBinding.instance.systemFonts.removeListener(
+      _BladePainter.resetKanji,
+    );
     _ticker.dispose();
     _frame.dispose();
     super.dispose();
@@ -143,8 +147,15 @@ class _Trail {
 }
 
 class _Flyer {
-  const _Flyer(this.pageY, this.x, this.size, this.depth, this.speed,
-      this.tilt, this.kunai);
+  const _Flyer(
+    this.pageY,
+    this.x,
+    this.size,
+    this.depth,
+    this.speed,
+    this.tilt,
+    this.kunai,
+  );
   final double pageY; // 0..1 along the whole page
   final double x; // 0..1 across the screen
   final double size;
@@ -156,15 +167,16 @@ class _Flyer {
 
 class _BladePainter extends CustomPainter {
   _BladePainter(this.scene, this.pointer, Listenable repaint)
-      : super(repaint: repaint);
+    : super(repaint: repaint);
 
   final _SceneState scene;
   final ValueNotifier<Offset?> pointer;
 
   static final _steel = MeshPainter();
   static final _crimson = MeshPainter(rimColor: CustomColors.secondary);
-  static final Vector3 _katanaTip = Models.katana.vertices
-      .reduce((a, b) => a.x > b.x ? a : b);
+  static final Vector3 _katanaTip = Models.katana.vertices.reduce(
+    (a, b) => a.x > b.x ? a : b,
+  );
 
   static const _flyers = [
     _Flyer(0.10, 0.035, 0.5, 0.55, 1.0, 1.0, false),
@@ -228,12 +240,18 @@ class _BladePainter extends CustomPainter {
     // Quantized so the CSS backdrop only changes in small steps.
     page = (page * 64).roundToDouble() / 64;
     final mid =
-        (math.exp(-math.pow((page - 0.55) / 0.18, 2)) * 32).roundToDouble() / 32;
-    final top = Color.lerp(const Color(0xff070912), const Color(0xff1a0609), mid)!;
+        (math.exp(-math.pow((page - 0.55) / 0.18, 2)) * 32).roundToDouble() /
+        32;
+    final top = Color.lerp(
+      const Color(0xff070912),
+      const Color(0xff1a0609),
+      mid,
+    )!;
     final bottom = Color.lerp(
-        Color.lerp(const Color(0xff10141f), const Color(0xff0b1712), page)!,
-        const Color(0xff2a0b10),
-        mid)!;
+      Color.lerp(const Color(0xff10141f), const Color(0xff0b1712), page)!,
+      const Color(0xff2a0b10),
+      mid,
+    )!;
     if (CssBackdrop.supported) {
       CssBackdrop.setSky(top, bottom);
       return;
@@ -241,8 +259,10 @@ class _BladePainter extends CustomPainter {
     canvas.drawRect(
       Offset.zero & size,
       Paint()
-        ..shader = ui.Gradient.linear(
-            Offset.zero, Offset(0, size.height), [top, bottom]),
+        ..shader = ui.Gradient.linear(Offset.zero, Offset(0, size.height), [
+          top,
+          bottom,
+        ]),
     );
   }
 
@@ -256,8 +276,11 @@ class _BladePainter extends CustomPainter {
         : Offset(w * 0.74, h * 0.3 - s * 0.3);
     if (center.dy < -r * 3) return;
     final crimson = math.exp(-math.pow((page - 0.55) / 0.2, 2));
-    final color =
-        Color.lerp(const Color(0xfff3ecd8), const Color(0xffff4d5e), crimson)!;
+    final color = Color.lerp(
+      const Color(0xfff3ecd8),
+      const Color(0xffff4d5e),
+      crimson,
+    )!;
     canvas.drawCircle(
       center,
       r * 2.2,
@@ -271,8 +294,11 @@ class _BladePainter extends CustomPainter {
       center,
       r,
       Paint()
-        ..shader = ui.Gradient.radial(center.translate(-r * 0.3, -r * 0.3),
-            r * 1.3, [color, Color.lerp(color, Colors.black, 0.35)!]),
+        ..shader = ui.Gradient.radial(
+          center.translate(-r * 0.3, -r * 0.3),
+          r * 1.3,
+          [color, Color.lerp(color, Colors.black, 0.35)!],
+        ),
     );
     // A few craters.
     final crater = Paint()..color = Colors.black.withValues(alpha: 0.08);
@@ -317,29 +343,44 @@ class _BladePainter extends CustomPainter {
     final w = size.width, h = size.height;
     final t = scene.time;
     final petal = Paint();
-    for (final p in _petals) {
+    // During a fling the page is already moving quickly. Halving the ambient
+    // particles in that short window keeps the expensive full-screen painter
+    // from competing with the scroll rasterization.
+    final limit = scene.velocity.abs() > 1600 ? 35 : _petals.length;
+    for (var i = 0; i < limit; i++) {
+      final p = _petals[i];
       final span = h + 60;
-      final y = ((p.y * span + t * p.speed * 40 - s * p.depth * 0.5) % span +
-              span) %
-          span -
+      final y =
+          ((p.y * span + t * p.speed * 40 - s * p.depth * 0.5) % span + span) %
+              span -
           30;
       final x = p.x * w + math.sin(t * p.speed + p.phase) * 40 * p.depth;
       if (p.ember) {
         final glow = 0.5 + 0.5 * math.sin(t * 3 + p.phase);
         // A soft halo plus a bright core reads as a glow without a blur pass.
-        petal.color = CustomColors.primary.withValues(alpha: 0.12 * glow + 0.05);
+        petal.color = CustomColors.primary.withValues(
+          alpha: 0.12 * glow + 0.05,
+        );
         canvas.drawCircle(Offset(x, y), p.size * 1.1, petal);
-        petal.color = CustomColors.primary.withValues(alpha: 0.35 + 0.55 * glow);
+        petal.color = CustomColors.primary.withValues(
+          alpha: 0.35 + 0.55 * glow,
+        );
         canvas.drawCircle(Offset(x, y), p.size * 0.35, petal);
       } else {
-        petal.color = const Color(0xffff9fb6).withValues(alpha: 0.35 + 0.4 * p.depth);
+        petal.color = const Color(
+          0xffff9fb6,
+        ).withValues(alpha: 0.35 + 0.4 * p.depth);
         canvas.save();
         canvas.translate(x, y);
         canvas.rotate(t * p.speed + p.phase);
         canvas.drawOval(
-            Rect.fromCenter(
-                center: Offset.zero, width: p.size * 2, height: p.size),
-            petal);
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: p.size * 2,
+            height: p.size,
+          ),
+          petal,
+        );
         canvas.restore();
       }
     }
@@ -350,6 +391,10 @@ class _BladePainter extends CustomPainter {
     final total = scene.extent + h;
     final unit = math.min(w, h) * (compact ? 0.06 : 0.075);
     for (var i = 0; i < _flyers.length; i++) {
+      // The 3D mesh painter transforms, lights, sorts and allocates a vertex
+      // buffer for every model. Keep the hero and alternating depth layers
+      // during a fast fling, then restore the full composition when settled.
+      if (scene.velocity.abs() > 1600 && i.isOdd) continue;
       final f = _flyers[i];
       final y = f.pageY * total * f.depth - s * f.depth + h * 0.5;
       if (y < -200 || y > h + 200) continue;
@@ -366,11 +411,15 @@ class _BladePainter extends CustomPainter {
         model.rotateZ(spin);
       }
       final painter = i.isEven ? _steel : _crimson;
-      painter.paint(canvas, f.kunai ? Models.kunai : Models.shuriken, model,
-          center: Offset(x, y),
-          scale: unit * f.size * (0.7 + f.depth * 0.6),
-          focal: 6,
-          opacity: compact ? 0.55 : 0.95);
+      painter.paint(
+        canvas,
+        f.kunai ? Models.kunai : Models.shuriken,
+        model,
+        center: Offset(x, y),
+        scale: unit * f.size * (0.7 + f.depth * 0.6),
+        focal: 6,
+        opacity: compact ? 0.55 : 0.95,
+      );
     }
   }
 
@@ -380,32 +429,46 @@ class _BladePainter extends CustomPainter {
     final vh = s / h;
 
     // 0..1 phases of the katana's choreography.
-    final slash = Curves.easeInOutCubic.transform(((vh - 0.05) / 0.6).clamp(0.0, 1.0));
-    final park = Curves.easeInOutCubic.transform(((vh - 0.65) / 0.55).clamp(0.0, 1.0));
+    final slash = Curves.easeInOutCubic.transform(
+      ((vh - 0.05) / 0.6).clamp(0.0, 1.0),
+    );
+    final park = Curves.easeInOutCubic.transform(
+      ((vh - 0.65) / 0.55).clamp(0.0, 1.0),
+    );
 
     final pointerOffset = pointer.value;
-    final tiltX = pointerOffset == null ? 0.0 : (pointerOffset.dy / h - 0.5) * 0.6;
-    final tiltY = pointerOffset == null ? 0.0 : (pointerOffset.dx / w - 0.5) * 0.8;
+    final tiltX = pointerOffset == null
+        ? 0.0
+        : (pointerOffset.dy / h - 0.5) * 0.6;
+    final tiltY = pointerOffset == null
+        ? 0.0
+        : (pointerOffset.dx / w - 0.5) * 0.8;
 
     final heroCenter = compact
         ? Offset(w * 0.5, h * 0.72)
         : Offset(w * 0.68, h * 0.55);
     final slashEnd = Offset(w * 0.32, h * 0.42);
-    final parkSpot = compact ? Offset(w - 26, h * 0.5) : Offset(w - 70, h * 0.52);
+    final parkSpot = compact
+        ? Offset(w - 26, h * 0.5)
+        : Offset(w - 70, h * 0.52);
 
     final center = Offset.lerp(
-        Offset.lerp(heroCenter, slashEnd, slash)!, parkSpot, park)!
-        .translate(0, math.sin(t * 1.3) * 10 * (1 - park));
+      Offset.lerp(heroCenter, slashEnd, slash)!,
+      parkSpot,
+      park,
+    )!.translate(0, math.sin(t * 1.3) * 10 * (1 - park));
     final baseUnit = math.min(w, h) * (compact ? 0.11 : 0.12);
     final unit = ui.lerpDouble(
-        ui.lerpDouble(baseUnit, baseUnit * 1.35, math.sin(slash * math.pi))!,
-        baseUnit * (compact ? 0.4 : 0.5),
-        park)!;
+      ui.lerpDouble(baseUnit, baseUnit * 1.35, math.sin(slash * math.pi))!,
+      baseUnit * (compact ? 0.4 : 0.5),
+      park,
+    )!;
 
     final rz = ui.lerpDouble(
-        ui.lerpDouble(0.55 + 0.06 * math.sin(t), -2.6, slash)!,
-        math.pi / 2,
-        park)!;
+      ui.lerpDouble(0.55 + 0.06 * math.sin(t), -2.6, slash)!,
+      math.pi / 2,
+      park,
+    )!;
     final ry = ui.lerpDouble(0.5 * math.sin(t * 0.45) + tiltY, 0, park)!;
     final rx = t * 0.6 * (1 - park) + s * 0.012 * park + tiltX;
 
@@ -415,8 +478,13 @@ class _BladePainter extends CustomPainter {
       ..rotateX(rx);
 
     // Slash trail from the tip of the blade.
-    final tip = projectPoint(_katanaTip, model,
-        center: center, scale: unit, focal: 9);
+    final tip = projectPoint(
+      _katanaTip,
+      model,
+      center: center,
+      scale: unit,
+      focal: 9,
+    );
     if (scene.tipTrail.isEmpty ||
         (scene.tipTrail.last.point - tip).distance > 2) {
       scene.tipTrail.add(_Trail(tip));
@@ -433,11 +501,15 @@ class _BladePainter extends CustomPainter {
           Colors.transparent,
         ]),
     );
-    _steel.paint(canvas, Models.katana, model,
-        center: center,
-        scale: unit,
-        focal: 9,
-        opacity: compact && park > 0.5 ? 0.6 : 1);
+    _steel.paint(
+      canvas,
+      Models.katana,
+      model,
+      center: center,
+      scale: unit,
+      focal: 9,
+      opacity: compact && park > 0.5 ? 0.6 : 1,
+    );
   }
 
   void _paintTrail(Canvas canvas, List<_Trail> trail) {
@@ -459,8 +531,11 @@ class _BladePainter extends CustomPainter {
         ..color = CustomColors.primary.withValues(alpha: 0.18 * life);
       core
         ..strokeWidth = 1 + 6 * along * life
-        ..color = Color.lerp(Colors.white, CustomColors.primary, 1 - along)!
-            .withValues(alpha: 0.85 * life);
+        ..color = Color.lerp(
+          Colors.white,
+          CustomColors.primary,
+          1 - along,
+        )!.withValues(alpha: 0.85 * life);
       canvas.drawLine(a.point, b.point, halo);
       canvas.drawLine(a.point, b.point, core);
     }
