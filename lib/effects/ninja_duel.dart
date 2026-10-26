@@ -28,24 +28,33 @@ class NinjaSprites {
   static final attackRight = _Anim((i) => 'Attack$i.webp', 536, 453, 0.24);
   static final attackLeft = _Anim((i) => 'AttackLeft$i.webp', 536, 453, 0.76);
 
-  static final all = [
-    idleRight,
-    idleLeft,
-    runRight,
-    runLeft,
-    jumpRight,
-    jumpLeft,
-    attackRight,
-    attackLeft,
-  ];
 
-  /// Decodes every frame up front so scrubbing never flickers.
+  /// Decodes every frame before the duel so scrubbing never flickers. Frames
+  /// load a few at a time, in the order the fight uses them: requesting all
+  /// 80 at once stalls a frame long enough to see while scrolling.
   static Future<void> precache(BuildContext context) async {
-    await Future.wait([
-      for (final anim in all)
-        for (var i = 0; i < 10; i++)
-          precacheImage(AssetImage(anim.frame(i)), context),
-    ]);
+    final frames = [
+      for (final anim in [
+        runRight,
+        runLeft,
+        jumpRight,
+        jumpLeft,
+        idleRight,
+        idleLeft,
+        attackRight,
+        attackLeft,
+      ])
+        for (var i = 0; i < 10; i++) AssetImage(anim.frame(i)),
+    ];
+    for (var i = 0; i < frames.length; i += 4) {
+      if (!context.mounted) return;
+      await Future.wait([
+        for (final image in frames.skip(i).take(4))
+          precacheImage(image, context),
+      ]);
+      // Let a frame render between batches.
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
   }
 }
 
@@ -104,39 +113,79 @@ class _NinjaDuelState extends State<NinjaDuel> {
     }
   }
 
-  /// How far through the pinned fight we are, from the section's progress.
-  static double _fight(double p, double vh, double total) {
-    final top = vh - p * (vh + total);
-    final pinned = (-top).clamp(0.0, total - vh);
-    return (pinned / (total - vh)).clamp(0.0, 1.0);
+  // The stage is pinned by offsetting it inside the tall section by exactly
+  // how far the section has scrolled past the top of the screen. That offset
+  // must update on every scroll change: any threshold lets the stage drift
+  // with the page and then snap back, which reads as the section bouncing.
+  final _pinned = ValueNotifier<double>(0);
+
+  // Fight progress drives sprite frames and effects; tiny steps aren't
+  // visible, so it only rebuilds the stage when it moves meaningfully.
+  final _fightProgress = ValueNotifier<double>(0);
+
+  ScrollPosition? _position;
+  double _total = 0, _viewport = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final position = Scrollable.maybeOf(context)?.position;
+    if (position != _position) {
+      _position?.removeListener(_onScroll);
+      _position = position?..addListener(_onScroll);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onScroll());
+  }
+
+  void _onScroll() {
+    if (!mounted || _total <= _viewport) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize || !box.attached) return;
+    final top = box.localToGlobal(Offset.zero).dy;
+    final pinned = (-top).clamp(0.0, _total - _viewport);
+    _pinned.value = pinned;
+    final q = pinned / (_total - _viewport);
+    _cue(q);
+    if ((q - _fightProgress.value).abs() > 0.0008 || q == 0 || q == 1) {
+      _fightProgress.value = q;
+    }
+  }
+
+  @override
+  void dispose() {
+    _position?.removeListener(_onScroll);
+    _pinned.dispose();
+    _fightProgress.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final vh = MediaQuery.sizeOf(context).height;
-    final total = vh * _scrollScreens;
+    _viewport = MediaQuery.sizeOf(context).height;
+    _total = _viewport * _scrollScreens;
+    final stage = RepaintBoundary(
+      child: ValueListenableBuilder<double>(
+        valueListenable: _fightProgress,
+        builder: (context, q, _) => _DuelStage(q: q),
+      ),
+    );
     return SizedBox(
-      height: total,
-      child: ScrollProgress(
-        onProgress: (p) => _cue(_fight(p, vh, total)),
-        builder: (context, p, _) {
-          // Where the section's top is relative to the viewport top.
-          final top = vh - p * (vh + total);
-          final pinned = (-top).clamp(0.0, total - vh);
-          final q = _fight(p, vh, total);
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                top: pinned,
-                left: 0,
-                right: 0,
-                height: vh,
-                child: _DuelStage(q: q),
-              ),
-            ],
-          );
-        },
+      height: _total,
+      child: ValueListenableBuilder<double>(
+        valueListenable: _pinned,
+        builder: (context, pinned, child) => Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: pinned,
+              left: 0,
+              right: 0,
+              height: _viewport,
+              child: child!,
+            ),
+          ],
+        ),
+        child: stage,
       ),
     );
   }
