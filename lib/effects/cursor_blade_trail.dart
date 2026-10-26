@@ -8,8 +8,11 @@ import '../utils/custom_colors.dart';
 /// behind it. Clicking leaves a short burst of sparks. The pointer position is
 /// also published to [pointer] so the 3D scene can lean toward the cursor.
 class CursorBladeTrail extends StatefulWidget {
-  const CursorBladeTrail(
-      {super.key, required this.child, required this.pointer});
+  const CursorBladeTrail({
+    super.key,
+    required this.child,
+    required this.pointer,
+  });
 
   final Widget child;
   final ValueNotifier<Offset?> pointer;
@@ -58,8 +61,16 @@ class _CursorBladeTrailState extends State<CursorBladeTrail>
   }
 
   void _move(Offset position) {
+    // Pointer events can arrive much faster than a frame. Keeping every
+    // event makes the trail needlessly expensive to repaint and eventually
+    // creates a large list during a fast mouse sweep.
+    if (_points.isNotEmpty && (_points.last.position - position).distance < 4) {
+      widget.pointer.value = position;
+      return;
+    }
     widget.pointer.value = position;
     _points.add(_Point(position));
+    if (_points.length > 32) _points.removeAt(0);
     _wake();
   }
 
@@ -67,8 +78,9 @@ class _CursorBladeTrailState extends State<CursorBladeTrail>
     for (var i = 0; i < 14; i++) {
       final angle = i / 14 * 6.283 + (i.isEven ? 0.2 : 0);
       final speed = 180.0 + (i % 5) * 70;
-      _sparks.add(_Spark(position,
-          Offset.fromDirection(angle, speed), i % 3 == 0));
+      _sparks.add(
+        _Spark(position, Offset.fromDirection(angle, speed), i % 3 == 0),
+      );
     }
     _wake();
   }
@@ -98,7 +110,8 @@ class _CursorBladeTrailState extends State<CursorBladeTrail>
             child: IgnorePointer(
               child: RepaintBoundary(
                 child: CustomPaint(
-                    painter: _TrailPainter(_points, _sparks, _life, _repaint)),
+                  painter: _TrailPainter(_points, _sparks, _life, _repaint),
+                ),
               ),
             ),
           ),
@@ -124,7 +137,7 @@ class _Spark {
 
 class _TrailPainter extends CustomPainter {
   _TrailPainter(this.points, this.sparks, this.life, Listenable repaint)
-      : super(repaint: repaint);
+    : super(repaint: repaint);
 
   final List<_Point> points;
   final List<_Spark> sparks;
