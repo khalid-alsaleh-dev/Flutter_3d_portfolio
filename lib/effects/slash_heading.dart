@@ -5,10 +5,76 @@ import 'package:flutter/material.dart';
 import '../utils/custom_colors.dart';
 import 'scroll_progress.dart';
 
-/// Section heading that starts sliced in two along a diagonal sword cut. As
-/// it scrolls into view the halves slide back together and a blade flash runs
-/// along the cut. Scrolling back up reverses it.
-class SlashHeading extends StatelessWidget {
+/// Where a section title is on screen and how far its slice has progressed,
+/// so the background katana can fly in and cut along it.
+class SlashTarget {
+  const SlashTarget(this.id, this.title, this.progress);
+
+  /// Stable identity of the heading, for per-title effects such as sounds.
+  final Object id;
+
+  /// The title text's rectangle in global (screen) coordinates.
+  final Rect title;
+
+  /// The heading's scroll progress: 0 as it enters at the bottom of the
+  /// screen, rising as it moves up. See [SlashTargets] for the phases.
+  final double progress;
+
+  /// The cut runs across the title from 62% height on the left to 38% on the
+  /// right, overshooting the text by 30px each side.
+  Offset get cutStart =>
+      Offset(title.left - 30, title.top + title.height * 0.62);
+  Offset get cutEnd =>
+      Offset(title.right + 30, title.top + title.height * 0.38);
+}
+
+/// Every [SlashHeading] on the page, plus the shared timing of a slice, in
+/// heading scroll progress:
+/// * [approachEnd]: the katana has flown from its parked spot to the cut;
+/// * [sweepEnd]: it has sliced along the cut, tip first;
+/// * [exitEnd]: it is parked again on the right.
+class SlashTargets {
+  static const approachEnd = 0.12;
+  static const sweepEnd = 0.26;
+  static const exitEnd = 0.40;
+
+  static final Set<_SlashHeadingState> _live = {};
+
+  /// Headings currently on screen, measured now.
+  static List<SlashTarget> visible(double viewport) {
+    final out = <SlashTarget>[];
+    for (final state in _live) {
+      final box = state.context.findRenderObject() as RenderBox?;
+      final titleBox =
+          state._titleKey.currentContext?.findRenderObject() as RenderBox?;
+      if (box == null ||
+          titleBox == null ||
+          !box.attached ||
+          !titleBox.attached ||
+          !box.hasSize ||
+          !titleBox.hasSize) {
+        continue;
+      }
+      final top = box.localToGlobal(Offset.zero).dy;
+      final progress = (viewport - top) / (viewport + box.size.height);
+      if (progress <= 0 || progress >= 1) continue;
+      out.add(
+        SlashTarget(
+          state,
+          titleBox.localToGlobal(Offset.zero) & titleBox.size,
+          progress,
+        ),
+      );
+    }
+    return out;
+  }
+}
+
+/// Section heading that the background katana slices as it scrolls in: the
+/// title appears whole, the blade sweeps along a diagonal cut, the halves
+/// split apart behind its tip with a glowing seam, then settle back together.
+/// Everything is scroll-driven, so scrolling back up reverses it.
+class SlashHeading extends StatefulWidget {
   const SlashHeading({
     super.key,
     required this.eyebrow,
@@ -21,85 +87,138 @@ class SlashHeading extends StatelessWidget {
   final CrossAxisAlignment alignment;
 
   @override
+  State<SlashHeading> createState() => _SlashHeadingState();
+}
+
+class _SlashHeadingState extends State<SlashHeading> {
+  final _titleKey = GlobalKey();
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Headings drawn off the page (e.g. for shader warm-up) are not targets.
+    final offPage =
+        context.dependOnInheritedWidgetOfExactType<ScrollProgressOverride>() !=
+        null;
+    offPage ? SlashTargets._live.remove(this) : SlashTargets._live.add(this);
+  }
+
+  @override
+  void dispose() {
+    SlashTargets._live.remove(this);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final fontSize = width < 600 ? 40.0 : (width < 1000 ? 54.0 : 68.0);
-    return ScrollProgress(builder: (context, p, _) {
-      final join = interval(p, 0.06, 0.3, Curves.easeOutCubic);
-      final flash = math.sin(interval(p, 0.24, 0.36) * math.pi);
-      final eyebrowIn = interval(p, 0.04, 0.2);
-      final apart = 1 - join;
-      final style = TextStyle(
-        color: Colors.white,
-        fontSize: fontSize,
-        fontWeight: FontWeight.w700,
-        height: 1.05,
-        letterSpacing: -1,
-      );
-      return Column(
-        crossAxisAlignment: alignment,
-        children: [
-          Opacity(
-            opacity: eyebrowIn,
-            child: Transform.translate(
-              offset: Offset(-30 * (1 - eyebrowIn), 0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 28 * eyebrowIn + 4,
-                    height: 2,
-                    color: CustomColors.secondary,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    eyebrow.toUpperCase(),
-                    style: const TextStyle(
-                      color: CustomColors.primary,
-                      fontSize: 14,
-                      letterSpacing: 4,
-                      fontWeight: FontWeight.w700,
+    return ScrollProgress(
+      builder: (context, p, _) {
+        final appear = interval(
+          p,
+          0.02,
+          SlashTargets.approachEnd,
+          Curves.easeOut,
+        );
+        // How far the blade's tip has travelled along the cut.
+        final sweep = interval(
+          p,
+          SlashTargets.approachEnd,
+          SlashTargets.sweepEnd,
+          Curves.easeInOut,
+        );
+        // The halves part as the blade passes and settle once it has gone.
+        final split = math.sin(
+          math.pi *
+              interval(
+                p,
+                SlashTargets.approachEnd + 0.01,
+                SlashTargets.exitEnd - 0.02,
+              ),
+        );
+        final seam =
+            1 - interval(p, SlashTargets.sweepEnd, SlashTargets.exitEnd);
+        final style = TextStyle(
+          color: Colors.white,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w700,
+          height: 1.05,
+          letterSpacing: -1,
+        );
+        return Column(
+          crossAxisAlignment: widget.alignment,
+          children: [
+            Opacity(
+              opacity: appear,
+              child: Transform.translate(
+                offset: Offset(-30 * (1 - appear), 0),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 28 * appear + 4,
+                      height: 2,
+                      color: CustomColors.secondary,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Text(
+                      widget.eyebrow.toUpperCase(),
+                      style: const TextStyle(
+                        color: CustomColors.primary,
+                        fontSize: 14,
+                        letterSpacing: 4,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Opacity(
-                opacity: join.clamp(0.0, 1.0) * 0.8 + 0.2,
-                child: Transform.translate(
-                  offset: Offset(-70 * apart, -18 * apart),
-                  child: ClipPath(
-                    clipper: const _HalfClipper(top: true),
-                    child: Text(title, style: style),
-                  ),
+            const SizedBox(height: 12),
+            Opacity(
+              opacity: appear,
+              child: Transform.translate(
+                offset: Offset(0, 24 * (1 - appear)),
+                child: Stack(
+                  key: _titleKey,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Transform.translate(
+                      offset: Offset(-14 * split, -9 * split),
+                      child: ClipPath(
+                        clipper: const _HalfClipper(top: true),
+                        child: Text(widget.title, style: style),
+                      ),
+                    ),
+                    Transform.translate(
+                      offset: Offset(14 * split, 9 * split),
+                      child: ClipPath(
+                        clipper: const _HalfClipper(top: false),
+                        child: Text(
+                          widget.title,
+                          style: style.copyWith(color: const Color(0xffe9edf2)),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _CutFlashPainter(
+                            sweep,
+                            seam * (sweep > 0 ? 1 : 0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Opacity(
-                opacity: join.clamp(0.0, 1.0) * 0.8 + 0.2,
-                child: Transform.translate(
-                  offset: Offset(70 * apart, 18 * apart),
-                  child: ClipPath(
-                    clipper: const _HalfClipper(top: false),
-                    child: Text(title,
-                        style: style.copyWith(color: const Color(0xffe9edf2))),
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(painter: _CutFlashPainter(flash, apart)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      );
-    });
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -135,41 +254,39 @@ class _HalfClipper extends CustomClipper<Path> {
 }
 
 class _CutFlashPainter extends CustomPainter {
-  _CutFlashPainter(this.flash, this.apart);
-  final double flash;
-  final double apart;
+  _CutFlashPainter(this.sweep, this.strength);
+
+  /// 0..1: how far along the cut the blade's tip is.
+  final double sweep;
+
+  /// 0..1: seam brightness, fading once the blade has passed.
+  final double strength;
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (strength <= 0.01 || sweep <= 0) return;
     final a = Offset(-30, size.height * 0.62);
     final b = Offset(size.width + 30, size.height * 0.38);
-    if (apart > 0.02) {
-      // A faint red seam while the heading is still cut.
-      canvas.drawLine(
-          a,
-          b,
-          Paint()
-            ..color = CustomColors.secondary.withValues(alpha: 0.6 * apart)
-            ..strokeWidth = 1.5);
-    }
-    if (flash <= 0.01) return;
-    final along = Offset.lerp(a, b, flash)!;
+    final tip = Offset.lerp(a, b, sweep)!;
     canvas.drawLine(
-        a,
-        along,
-        Paint()
-          ..color = CustomColors.primary.withValues(alpha: 0.8 * flash)
-          ..strokeWidth = 6
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
+      a,
+      tip,
+      Paint()
+        ..color = CustomColors.primary.withValues(alpha: 0.35 * strength)
+        ..strokeWidth = 7
+        ..strokeCap = StrokeCap.round,
+    );
     canvas.drawLine(
-        a,
-        along,
-        Paint()
-          ..color = Colors.white.withValues(alpha: flash)
-          ..strokeWidth = 1.6);
+      a,
+      tip,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.95 * strength)
+        ..strokeWidth = 1.6
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _CutFlashPainter old) =>
-      old.flash != flash || old.apart != apart;
+      old.sweep != sweep || old.strength != strength;
 }
