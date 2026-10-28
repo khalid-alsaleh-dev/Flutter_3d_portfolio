@@ -13,6 +13,7 @@ import '../three_d/models.dart';
 import '../utils/custom_colors.dart';
 import 'slash_heading.dart';
 import 'css_backdrop.dart';
+import 'page_wake.dart';
 
 /// The fixed, full-screen layer behind the whole page.
 ///
@@ -55,8 +56,19 @@ class _BladeBackgroundState extends State<BladeBackground>
   @override
   void initState() {
     super.initState();
-    _ticker = createTicker(_tick)..start();
-    PaintingBinding.instance.systemFonts.addListener(_BladePainter.resetKanji);
+    // Until the page wakes the scene is a still frame, see [PageWake].
+    _ticker = createTicker(_tick);
+    PageWake.awake.then((_) {
+      if (mounted) _ticker.start();
+    });
+    PaintingBinding.instance.systemFonts.addListener(_onSystemFonts);
+  }
+
+  /// The kanji's font arrives after the first paint; redraw it even while
+  /// the ticker is still waiting.
+  void _onSystemFonts() {
+    _BladePainter.resetKanji();
+    _frame.value++;
   }
 
   void _tick(Duration elapsed) {
@@ -107,9 +119,7 @@ class _BladeBackgroundState extends State<BladeBackground>
 
   @override
   void dispose() {
-    PaintingBinding.instance.systemFonts.removeListener(
-      _BladePainter.resetKanji,
-    );
+    PaintingBinding.instance.systemFonts.removeListener(_onSystemFonts);
     _ticker.dispose();
     super.dispose();
   }

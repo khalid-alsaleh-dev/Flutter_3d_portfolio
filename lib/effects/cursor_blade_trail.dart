@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../audio/sound_fx.dart';
 import '../utils/custom_colors.dart';
+import 'page_wake.dart';
 
 /// Tracks the mouse over [child] and draws a glowing katana-slash trail
 /// behind it. Clicking leaves a short burst of sparks. The pointer position is
@@ -99,7 +100,9 @@ class _CursorBladeTrailState extends State<CursorBladeTrail>
       onPointerHover: (e) => _move(e.position),
       onPointerMove: (e) => _move(e.position),
       onPointerDown: (e) {
-        // Any click or tap is the user gesture browsers require for audio.
+        // Any click or tap is the user gesture browsers require for audio,
+        // and a sign the visitor is here (see [PageWake]).
+        PageWake.wake();
         SoundFx.unlock();
         _burst(e.position);
       },

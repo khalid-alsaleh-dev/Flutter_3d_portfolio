@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +11,7 @@ import '../effects/blade_background.dart';
 import '../effects/css_backdrop.dart';
 import '../effects/cursor_blade_trail.dart';
 import '../effects/ninja_duel.dart';
+import '../effects/page_wake.dart';
 import '../effects/shader_primer.dart';
 import '../sections/contact.dart';
 import '../sections/experience.dart';
@@ -45,20 +48,28 @@ class _HomeState extends State<Home> {
   ];
 
   bool _precached = false;
+  Timer? _wakeFallback;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onScroll);
+    // Mouse movement; taps wake the page in [CursorBladeTrail].
+    _pointer.addListener(PageWake.wake);
     HardwareKeyboard.instance.addHandler(_unlockAudio);
-    // Fetch the (small) effect files once the first frame is up, so they are
-    // ready the moment the visitor's first click unlocks audio.
+    // A visitor who just watches still gets the ambient motion, once the
+    // page has long finished loading.
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => Future.delayed(const Duration(seconds: 2), SoundFx.preload),
+      (_) => _wakeFallback = Timer(const Duration(seconds: 8), PageWake.wake),
     );
+    // Fetch the effect files as soon as the visitor shows up, so they are
+    // ready by the time their first click unlocks audio, without competing
+    // with the page load.
+    PageWake.awake.then((_) => SoundFx.preload());
   }
 
   void _onScroll() {
+    PageWake.wake();
     final position = _controller.position;
     final max = position.maxScrollExtent;
     _progress.value = max <= 0 ? 0 : (position.pixels / max).clamp(0.0, 1.0);
@@ -95,12 +106,14 @@ class _HomeState extends State<Home> {
 
   /// A key press also counts as the gesture browsers require for audio.
   bool _unlockAudio(KeyEvent event) {
+    PageWake.wake();
     SoundFx.unlock();
     return false;
   }
 
   @override
   void dispose() {
+    _wakeFallback?.cancel();
     HardwareKeyboard.instance.removeHandler(_unlockAudio);
     _controller.dispose();
     _pointer.dispose();

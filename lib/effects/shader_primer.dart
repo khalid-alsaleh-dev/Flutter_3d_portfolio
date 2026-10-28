@@ -5,6 +5,7 @@ import '../sections/overview.dart';
 import '../sections/skills.dart';
 import '../widgets/footer.dart';
 import 'ninja_duel.dart';
+import 'page_wake.dart';
 import 'scroll_progress.dart';
 
 /// Compiles the page's GPU shaders before the visitor scrolls to them.
@@ -40,8 +41,12 @@ class _ShaderPrimerState extends State<ShaderPrimer> {
   @override
   void initState() {
     super.initState();
-    // Wait for the hero's entrance animation to settle first.
-    Future<void>.delayed(const Duration(milliseconds: 1800), _next);
+    // Wait for the hero's entrance animation to settle, and for the visitor
+    // to show up: priming is heavy work that must not slow the page load.
+    Future.wait([
+      Future<void>.delayed(const Duration(milliseconds: 1800)),
+      PageWake.awake,
+    ]).then((_) => _next());
   }
 
   void _next() {

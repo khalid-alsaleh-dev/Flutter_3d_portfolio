@@ -23,7 +23,8 @@
   <title>Khalid Al-Saleh · Shinobi of Code</title>
   <link rel="manifest" href="manifest.json">
 
-  <script type="module" src="./assets/packages/model_viewer_plus/assets/model-viewer.min.js" defer></script>
+  <!-- The <model-viewer> library is added by lib/widgets/planet.dart once
+       the visitor nears the planet, so it stays out of the page load. -->
 
   <style>
     /* :root, not `html`: model_viewer_plus embeds its own <html> element.
