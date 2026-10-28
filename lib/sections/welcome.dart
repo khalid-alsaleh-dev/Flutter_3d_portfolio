@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/portfolio_data.dart';
+import '../effects/page_wake.dart';
 import '../effects/scroll_progress.dart';
 import '../utils/custom_colors.dart';
 import '../utils/launch.dart';
@@ -210,14 +211,19 @@ class _TypedRoles extends StatefulWidget {
 class _TypedRolesState extends State<_TypedRoles> {
   Timer? _timer;
   int _role = 0;
-  int _chars = 0;
+  // The first role starts fully typed: a still hero reads complete until
+  // the page wakes and the typing begins (see [PageWake]).
+  int _chars = PortfolioData.typedRoles[0].length;
   bool _deleting = false;
-  int _hold = 0;
+  int _hold = 26;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(milliseconds: 70), (_) => _step());
+    PageWake.awake.then((_) {
+      if (!mounted) return;
+      _timer = Timer.periodic(const Duration(milliseconds: 70), (_) => _step());
+    });
   }
 
   void _step() {
@@ -259,15 +265,20 @@ class _TypedRolesState extends State<_TypedRoles> {
           TextSpan(text: word),
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
-            child:
-                Container(
-                      width: 3,
-                      height: widget.fontSize,
-                      margin: const EdgeInsets.only(left: 3),
-                      color: CustomColors.primary,
-                    )
+            child: WhenAwake(
+              builder: (context, awake) {
+                final cursor = Container(
+                  width: 3,
+                  height: widget.fontSize,
+                  margin: const EdgeInsets.only(left: 3),
+                  color: CustomColors.primary,
+                );
+                if (!awake) return cursor;
+                return cursor
                     .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .fadeOut(duration: 450.ms),
+                    .fadeOut(duration: 450.ms);
+              },
+            ),
           ),
         ],
       ),
@@ -298,26 +309,34 @@ class _ScrollHint extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Container(
+        WhenAwake(
+          builder: (context, awake) {
+            const line = SizedBox(
               width: 2,
               height: 46,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [CustomColors.primary, Colors.transparent],
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [CustomColors.primary, Colors.transparent],
+                  ),
                 ),
               ),
-            )
-            .animate(onPlay: (c) => c.repeat())
-            .scaleY(
-              begin: 0,
-              end: 1,
-              alignment: Alignment.topCenter,
-              duration: 900.ms,
-            )
-            .then()
-            .fadeOut(duration: 400.ms),
+            );
+            if (!awake) return line;
+            return line
+                .animate(onPlay: (c) => c.repeat())
+                .scaleY(
+                  begin: 0,
+                  end: 1,
+                  alignment: Alignment.topCenter,
+                  duration: 900.ms,
+                )
+                .then()
+                .fadeOut(duration: 400.ms);
+          },
+        ),
       ],
     ).animate().fadeIn(delay: 2200.ms);
   }

@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 import '../data/portfolio_data.dart';
 import '../effects/scroll_progress.dart';
 import '../effects/slash_heading.dart';
-import '../ninja_game/dojo.dart';
+import '../ninja_game/dojo.dart' deferred as dojo;
 import '../utils/custom_colors.dart';
+import '../widgets/load_when_near.dart';
 import '../widgets/project_card.dart';
 import '../widgets/section_frame.dart';
 
@@ -62,10 +63,38 @@ class _ProjectsState extends State<Projects> {
               ],
             ),
             const SizedBox(height: 36),
-            if (playing) const Dojo() else const _ProjectGrid(),
+            if (playing)
+              const LoadWhenNear(
+                placeholder: SizedBox(height: _dojoHeight),
+                child: _DeferredDojo(),
+              )
+            else
+              const _ProjectGrid(),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Height of the [dojo.Dojo] stage, held while its code downloads.
+const _dojoHeight = 940.0;
+
+/// The game engine is only used by the dojo (and never on phones), so it is
+/// compiled into a separate file that loads as the visitor nears it.
+class _DeferredDojo extends StatelessWidget {
+  const _DeferredDojo();
+
+  static final _loaded = dojo.loadLibrary();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _loaded,
+      builder: (context, snapshot) =>
+          snapshot.connectionState == ConnectionState.done
+          ? dojo.Dojo()
+          : const SizedBox(height: _dojoHeight),
     );
   }
 }

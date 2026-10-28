@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
 import '../utils/custom_colors.dart';
+import 'load_when_near.dart';
 
 /// A full-length website screenshot playing inside a browser window: it
 /// scrolls slowly down and back up like a screen recording. Hovering pauses
@@ -46,7 +47,8 @@ class _SitePreviewState extends State<SitePreview>
 
   void _onVisibility(VisibilityInfo info) {
     if (!mounted) return;
-    _visible = info.visibleFraction > 0.05;
+    final visible = info.visibleFraction > 0.05;
+    if (visible != _visible) setState(() => _visible = visible);
     _visible ? _play() : _scroll.stop();
   }
 
@@ -127,12 +129,20 @@ class _SitePreviewState extends State<SitePreview>
                               child: OverflowBox(
                                 alignment: Alignment.topCenter,
                                 maxHeight: imageHeight,
-                                child: Image.asset(
-                                  widget.asset,
-                                  width: c.maxWidth,
-                                  height: imageHeight,
-                                  fit: BoxFit.fill,
-                                  filterQuality: FilterQuality.medium,
+                                // Full-page screenshots are large; fetch them
+                                // only as the projects come up.
+                                child: LoadWhenNear(
+                                  placeholder: SizedBox(
+                                    width: c.maxWidth,
+                                    height: imageHeight,
+                                  ),
+                                  child: Image.asset(
+                                    widget.asset,
+                                    width: c.maxWidth,
+                                    height: imageHeight,
+                                    fit: BoxFit.fill,
+                                    filterQuality: FilterQuality.medium,
+                                  ),
                                 ),
                               ),
                             ),
@@ -141,6 +151,7 @@ class _SitePreviewState extends State<SitePreview>
                               right: 10,
                               child: _Badge(
                                 hovering: _hovering,
+                                pulsing: _visible,
                                 accent: widget.accent,
                               ),
                             ),
@@ -213,12 +224,28 @@ class _SitePreviewState extends State<SitePreview>
 }
 
 class _Badge extends StatelessWidget {
-  const _Badge({required this.hovering, required this.accent});
+  const _Badge({
+    required this.hovering,
+    required this.pulsing,
+    required this.accent,
+  });
   final bool hovering;
+
+  /// Off while the preview is off screen, where a looping pulse would keep
+  /// the page drawing frames nobody sees.
+  final bool pulsing;
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
+    final dot = Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(
+        color: hovering ? CustomColors.steel : accent,
+        shape: BoxShape.circle,
+      ),
+    );
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
@@ -228,16 +255,12 @@ class _Badge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: hovering ? CustomColors.steel : accent,
-                  shape: BoxShape.circle,
-                ),
-              )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .fadeOut(duration: 700.ms),
+          if (pulsing)
+            dot
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .fadeOut(duration: 700.ms)
+          else
+            dot,
           const SizedBox(width: 6),
           Text(
             hovering ? 'Move to explore' : 'Live preview',
