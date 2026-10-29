@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../data/portfolio_data.dart';
 import '../effects/scroll_progress.dart';
 import '../effects/slash_heading.dart';
 import '../utils/custom_colors.dart';
@@ -104,11 +105,27 @@ class _ContactState extends State<Contact> {
             _field(_message, 'What would you like to build?',
                 maxLines: 6, validator: _required),
             const SizedBox(height: 26),
-            BladeButton(
-              label: 'Send',
-              icon: Icons.send_rounded,
-              filled: true,
-              onPressed: _send,
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                BladeButton(
+                  label: 'Send',
+                  icon: Icons.send_rounded,
+                  filled: true,
+                  onPressed: _send,
+                ),
+                const BladeButton(
+                  label: 'WhatsApp',
+                  icon: Icons.chat_rounded,
+                  onPressed: openWhatsApp,
+                ),
+                const BladeButton(
+                  label: Links.phoneLabel,
+                  icon: Icons.call_rounded,
+                  onPressed: callPhone,
+                ),
+              ],
             ),
           ],
         ),

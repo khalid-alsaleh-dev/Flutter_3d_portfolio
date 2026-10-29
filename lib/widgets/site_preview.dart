@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:visibility_detector/visibility_detector.dart';
 
 import '../utils/custom_colors.dart';
 import 'load_when_near.dart';
+import 'on_screen.dart';
 
 /// A full-length website screenshot playing inside a browser window: it
 /// scrolls slowly down and back up like a screen recording. Hovering pauses
@@ -45,10 +45,9 @@ class _SitePreviewState extends State<SitePreview>
     _scroll.repeat(reverse: true);
   }
 
-  void _onVisibility(VisibilityInfo info) {
+  void _onScreen(bool visible) {
     if (!mounted) return;
-    final visible = info.visibleFraction > 0.05;
-    if (visible != _visible) setState(() => _visible = visible);
+    setState(() => _visible = visible);
     _visible ? _play() : _scroll.stop();
   }
 
@@ -71,9 +70,8 @@ class _SitePreviewState extends State<SitePreview>
   Widget build(BuildContext context) {
     final parsedHost = Uri.tryParse(widget.url)?.host ?? '';
     final host = parsedHost.isEmpty ? widget.url : parsedHost;
-    return VisibilityDetector(
-      key: ValueKey('preview-${widget.asset}'),
-      onVisibilityChanged: _onVisibility,
+    return OnScreen(
+      onChanged: _onScreen,
       child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: RadialGradient(
@@ -91,7 +89,7 @@ class _SitePreviewState extends State<SitePreview>
             borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
             child: Column(
               children: [
-                _chrome(host),
+                BrowserBar(host: host),
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, c) {
@@ -168,8 +166,16 @@ class _SitePreviewState extends State<SitePreview>
       ),
     );
   }
+}
 
-  Widget _chrome(String host) {
+/// The top of a browser window: traffic lights and the address bar.
+class BrowserBar extends StatelessWidget {
+  const BrowserBar({super.key, required this.host});
+
+  final String host;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       height: 26,
       color: const Color(0xff1b1f2a),

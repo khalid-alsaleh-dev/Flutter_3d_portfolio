@@ -34,6 +34,7 @@ flutter:
     - assets/images/
     - assets/images/sprites/
     - assets/images/previews/
+    - assets/images/reels/
     - assets/audio/
 
   fonts:
