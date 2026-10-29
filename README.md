@@ -4,7 +4,7 @@ This project designed using figma and built using flutter.
 
 
 ## Demo URL
-soon will be hosted 
+https://khalid-alsaleh-dev.github.io/
 
   
 
@@ -16,9 +16,9 @@ soon will be hosted
 - A little knowledge of Dart and Flutter
 
 ## Download The Project,Install Dependencies && Run The Project 
-- Run the next command to Clone the repo to your machine `https://github.com/khalid-alsaleh-dev/Flutter_3d_portfolio`
+- Run the next command to Clone the repo to your machine `https://github.com/khalid-alsaleh-dev/khalid-alsaleh-dev.github.io`
 - Run the next commands to install the required dependencies
-  1. `cd <../path/to/Flutter_3d_portfolio>`
+  1. `cd <../path/to/khalid-alsaleh-dev.github.io>`
   2. `flutter pub get`
 - Run the next command to run the project on the web `flutter run -d chrome`
 - Build for hosting: `flutter build web --release --wasm` (output in `build/web`).
