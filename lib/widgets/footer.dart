@@ -45,6 +45,14 @@ class Footer extends StatelessWidget {
                 style: TextStyle(color: CustomColors.primary, fontSize: 18),
               ),
             ),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: [
+                _contact(Icons.call_rounded, Links.phoneLabel, callPhone),
+                _contact(Icons.chat_rounded, 'WhatsApp', openWhatsApp),
+              ],
+            ),
             const SizedBox(height: 6),
             const LocationTag(),
             const SizedBox(height: 48),
@@ -69,6 +77,17 @@ class Footer extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _contact(IconData icon, String label, VoidCallback onPressed) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18, color: CustomColors.primary),
+      label: Text(
+        label,
+        style: const TextStyle(color: CustomColors.primary, fontSize: 16),
       ),
     );
   }

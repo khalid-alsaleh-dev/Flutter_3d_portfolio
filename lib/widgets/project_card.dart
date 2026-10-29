@@ -5,6 +5,8 @@ import '../effects/tilt_card.dart';
 import '../utils/custom_colors.dart';
 import '../utils/launch.dart';
 import 'app_mockup.dart';
+import 'app_reel.dart';
+import 'form_reel.dart';
 import 'site_preview.dart';
 
 class ProjectCard extends StatelessWidget {
@@ -54,10 +56,19 @@ class ProjectCard extends StatelessWidget {
               project.preview,
               project.url ?? project.previewHost,
             )) {
+              (_, final url?) when project.formReel != null => FormReelView(
+                reel: project.formReel!,
+                host: url,
+                accent: project.accent,
+              ),
               (final preview?, final url?) => SitePreview(
                 asset: preview,
                 aspect: project.previewAspect,
                 url: url,
+                accent: project.accent,
+              ),
+              _ when project.reel != null => AppReelView(
+                reel: project.reel!,
                 accent: project.accent,
               ),
               _ => AppMockup(project: project),

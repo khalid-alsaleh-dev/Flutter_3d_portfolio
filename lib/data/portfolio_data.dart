@@ -4,6 +4,9 @@ import '../utils/image_assets.dart';
 
 class Links {
   static const email = 'khalid.alsaleh.dev@gmail.com';
+  static const phone = '+971542469465';
+  static const phoneLabel = '+971 54 246 9465';
+  static const whatsapp = 'https://wa.me/971542469465';
   static const github = 'https://github.com/khalid-alsaleh-dev';
   static const linkedin =
       'https://www.linkedin.com/in/khalid-al-saleh-3561881a8/';
@@ -66,6 +69,8 @@ class Project {
     this.preview,
     this.previewAspect = 1,
     this.previewHost,
+    this.reel,
+    this.formReel,
   });
   final String title;
   final String description;
@@ -94,8 +99,104 @@ class Project {
   /// link to (for example, a platform that is no longer online).
   final String? previewHost;
 
+  /// Two real app screens played as a short looping walkthrough on a phone.
+  /// Takes the place of the phone mockup.
+  final AppReel? reel;
+
+  /// One website screenshot played as a screen recording of filling in its
+  /// form. Takes the place of [preview].
+  final FormReel? formReel;
+
   bool get hasLinks =>
       url != null || github != null || appStore != null || playStore != null;
+}
+
+/// A walkthrough of an app from two screenshots: the list screen, a tap on
+/// one item, its detail screen, a tap on its like button, and back.
+class AppReel {
+  const AppReel({
+    required this.list,
+    required this.detail,
+    required this.open,
+    required this.like,
+    required this.stamp,
+    required this.items,
+    this.chip,
+  });
+
+  /// Screenshots of the app screen only (no device frame), 9:16.
+  final String list;
+  final String detail;
+
+  /// Where the finger taps, as fractions of the screen: the item opened on
+  /// [list], and the like button on [detail].
+  final Offset open;
+  final Offset like;
+
+  /// Badge stamped onto the detail screen, e.g. a discount.
+  final String stamp;
+
+  /// Items from the list screen, shown as tickets beside the phone: a short
+  /// label and its name. The last one is the item that gets opened.
+  final List<(String, String)> items;
+
+  /// Small label in the corner, e.g. the app's languages.
+  final String? chip;
+}
+
+/// A screen recording made from one website screenshot: the cursor clicks
+/// [connect], the view zooms in on the form, each field is typed in, [submit]
+/// is clicked and a confirmation pops up.
+///
+/// Every rect is a fraction of the screenshot (left, top, right, bottom).
+class FormReel {
+  const FormReel({
+    required this.shot,
+    required this.aspect,
+    required this.connect,
+    required this.connected,
+    required this.badge,
+    required this.fields,
+    required this.submit,
+    required this.done,
+    this.shine,
+    this.colors = const FormReelColors(),
+  });
+
+  final String shot;
+
+  /// Screenshot height divided by width.
+  final double aspect;
+
+  /// The button clicked first, and the label it shows afterwards. The label
+  /// also appears in [badge] (e.g. the connected account on a card).
+  final Rect connect;
+  final String connected;
+  final Rect badge;
+
+  /// Area that shines once the form is sent (e.g. the card holding [badge]).
+  final Rect? shine;
+
+  /// Each input and the text typed into it.
+  final List<(Rect, String)> fields;
+  final Rect submit;
+
+  /// Confirmation shown once the form is sent.
+  final String done;
+  final FormReelColors colors;
+}
+
+/// The site's own colours, so drawn-on states blend with the screenshot.
+class FormReelColors {
+  const FormReelColors({
+    this.field = const Color(0xff232746),
+    this.button = const Color(0xff2952E3),
+    this.panel = const Color(0xff191C2F),
+  });
+
+  final Color field;
+  final Color button;
+  final Color panel;
 }
 
 class PortfolioData {
@@ -239,14 +340,45 @@ class PortfolioData {
       icon: Icons.local_offer_rounded,
       layout: MockLayout.deals,
       tags: ['Flutter', 'Payments', 'Backend', 'Freelance'],
+      reel: AppReel(
+        list: 'assets/images/reels/deals_feed.webp',
+        detail: 'assets/images/reels/deals_detail.webp',
+        open: Offset(0.5, 0.88),
+        like: Offset(0.66, 0.975),
+        stamp: '−67%',
+        items: [
+          ('−40%', 'Vileda Steam'),
+          ('−29%', 'Dell Inspiron'),
+          ('−67%', 'Puma Basket'),
+        ],
+        chip: 'DE · AR',
+      ),
     ),
     Project(
-      'Saudi E-Commerce App',
-      'E-commerce platform for the Saudi market: a Flutter storefront app with authentication and a Node.js backend.',
-      accent: Color(0xffF2B84B),
-      icon: Icons.shopping_bag_rounded,
+      'EthKrypto',
+      'A Web3 app for sending Ethereum. A Solidity smart contract, built and deployed with Hardhat, records every transfer on chain with a message and a keyword. The React and TypeScript frontend connects to MetaMask through ethers.js, sends ETH and lists the latest transfers, each with a GIF matched to its keyword.',
+      accent: Color(0xff2952E3),
+      icon: Icons.account_balance_wallet_rounded,
       layout: MockLayout.shop,
-      tags: ['Flutter', 'Node.js', 'E-commerce', 'Auth'],
+      tags: ['Web3', 'Solidity', 'React', 'TypeScript', 'ethers.js'],
+      github: 'https://github.com/khalid-alsaleh-dev/Ethkrypto',
+      previewHost: 'localhost:3000',
+      formReel: FormReel(
+        shot: 'assets/images/previews/ethkrypto.webp',
+        aspect: 969 / 1892,
+        connect: Rect.fromLTRB(0.2738, 0.3973, 0.4915, 0.4469),
+        connected: '0x8a3F…c9D1',
+        badge: Rect.fromLTRB(0.5518, 0.2704, 0.6342, 0.2910),
+        shine: Rect.fromLTRB(0.5449, 0.1703, 0.6971, 0.3354),
+        fields: [
+          (Rect.fromLTRB(0.5307, 0.3860, 0.7114, 0.4231), '0x5aE0…41f2'),
+          (Rect.fromLTRB(0.5307, 0.4396, 0.7114, 0.4768), '0.05'),
+          (Rect.fromLTRB(0.5307, 0.4933, 0.7114, 0.5304), 'to the moon'),
+          (Rect.fromLTRB(0.5307, 0.5470, 0.7114, 0.5841), 'Coffee is on me'),
+        ],
+        submit: Rect.fromLTRB(0.5307, 0.6182, 0.7114, 0.6574),
+        done: 'Sent 0.05 ETH · confirmed',
+      ),
     ),
   ];
   static const skills = [
